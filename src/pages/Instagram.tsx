@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { Grid, Heart, MessageCircle, Share2, X, Bookmark } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Grid, Heart, MessageCircle, Share2, X, Bookmark, Plus, Edit2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+import { useImageSystem } from '../hooks/useImageSystem';
 
 type PostType = 'PULSE' | 'RITUAL' | 'SIGNAL';
 
@@ -10,21 +12,19 @@ interface Post {
   title: string;
   likes: number;
   caption: string;
+  imageUrl?: string;
+  isPlaceholder?: boolean; // Flag to know if it's a real upload or a filler
 }
 
-// Generate 12 posts with 3-layer cycle
-const posts: Post[] = Array.from({ length: 12 }).map((_, i) => {
-  const typeCycle: PostType[] = ['PULSE', 'RITUAL', 'SIGNAL'];
-  const type = typeCycle[i % 3];
-  
-  return {
-    id: i + 1,
-    type,
+// Generate 12 placeholder posts
+const placeholderPosts: Post[] = Array.from({ length: 12 }).map((_, i) => ({
+    id: i,
+    type: ['PULSE', 'RITUAL', 'SIGNAL'][i % 3] as PostType,
     title: `Frequency ${i + 14}`,
     likes: 800 + i * 42,
-    caption: `Cycle ${i + 1}. The resonant field expands. \n\n#astrion #frequency #techno`
-  };
-});
+    caption: `Cycle ${i + 1}. The resonant field expands. \n\n#astrion #frequency #techno`,
+    isPlaceholder: true
+}));
 
 function PostVisual({ type, index }: { type: PostType, index: number }) {
   if (type === 'PULSE') {
@@ -67,9 +67,66 @@ function PostVisual({ type, index }: { type: PostType, index: number }) {
 
 export function Instagram() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const { images, loading, uploadImage } = useImageSystem('instagram');
+  const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeSlotRef = useRef<number | null>(null);
+
+  // Mapped Grid: Combine Placeholders with Real Uploads
+  // We expect files named "instagram_post_0", "instagram_post_1", etc.
+  const displayPosts: Post[] = placeholderPosts.map((placeholder, idx) => {
+      // Find if we have an image for this slot
+      const existingImage = images.find(img => img.name === `instagram_post_${idx}`);
+      
+      if (existingImage) {
+          return {
+              ...placeholder,
+              imageUrl: existingImage.url,
+              isPlaceholder: false,
+              caption: `Uploaded Content // Slot ${idx}`
+          };
+      }
+      return placeholder;
+  });
+
+  const handleUploadClick = (e: React.MouseEvent, slotIndex: number) => {
+      e.stopPropagation(); // Prevent opening modal
+      activeSlotRef.current = slotIndex;
+      fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const slot = activeSlotRef.current;
+      if (e.target.files && e.target.files[0] && slot !== null) {
+          setUploadingSlot(slot);
+          try {
+              const file = e.target.files[0];
+              // Upload with specific name to lock it to this grid slot
+              await uploadImage(file, `instagram_post_${slot}`);
+          } catch (error) {
+              console.error("Grid upload failed", error);
+              alert("Error uploading to grid.");
+          } finally {
+              setUploadingSlot(null);
+              // Reset input
+              if (fileInputRef.current) fileInputRef.current.value = '';
+          }
+      }
+  };
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
+      
+      {/* Hidden Global Input */}
+      <input 
+         type="file" 
+         ref={fileInputRef} 
+         className="hidden" 
+         accept="image/*"
+         onChange={handleFileChange}
+      />
+
+      {/* ... Header ... */}
       <div className="flex flex-col gap-4 pt-4">
            {/* Profile Header */}
            <div className="flex items-center gap-8 md:gap-12 pl-4 md:pl-8">
@@ -88,7 +145,7 @@ export function Instagram() {
                  </div>
                  
                  <div className="flex items-center gap-8 text-sm">
-                    <span><span className="font-bold text-bone">21</span> <span className="text-bone/60">posts</span></span>
+                    <span><span className="font-bold text-bone">12</span> <span className="text-bone/60">posts</span></span>
                     <span><span className="font-bold text-bone">12.5k</span> <span className="text-bone/60">followers</span></span>
                     <span><span className="font-bold text-bone">42</span> <span className="text-bone/60">following</span></span>
                  </div>
@@ -156,38 +213,67 @@ export function Instagram() {
         </button>
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-3 gap-1 md:gap-4">
-        {posts.map((post, idx) => (
-          <motion.div 
-            key={post.id}
-            layoutId={`post-${post.id}`}
-            onClick={() => setSelectedPost(post)}
-            className="aspect-square cursor-pointer relative group overflow-hidden bg-abyss-deep"
-            whileHover={{ scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-          >
-            <PostVisual type={post.type} index={idx} />
-            
-            {/* Hover overlay */}
-            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6 text-bone">
-              <div className="flex items-center gap-2">
-                <Heart className="w-5 h-5 fill-white" />
-                <span className="font-bold">{post.likes}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <MessageCircle className="w-5 h-5 fill-white" />
-                <span className="font-bold">{idx * 3 + 4}</span>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+       {/* Grid */}
+       <div className="grid grid-cols-3 gap-1 md:gap-4 relative min-h-[300px]">
+         {loading && (
+             <div className="absolute inset-0 flex items-center justify-center bg-abyss/50 z-10 pointer-events-none">
+                 <div className="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+             </div>
+         )}
+         
+         {displayPosts.map((post, idx) => (
+           <motion.div 
+             key={post.id}
+             layoutId={`post-${post.id}`}
+             onClick={() => setSelectedPost(post)}
+             className="aspect-square cursor-pointer relative group overflow-hidden bg-abyss-deep"
+             whileHover={{ scale: 0.98 }}
+             transition={{ duration: 0.2 }}
+           >
+             {/* Main Visual */}
+             {post.imageUrl ? (
+                 <img src={post.imageUrl} alt="post" className="w-full h-full object-cover" />
+             ) : (
+                 <PostVisual type={post.type} index={idx} />
+             )}
+
+             {/* Interact Overlay (Edit/Upload) */}
+             <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                  onClick={(e) => handleUploadClick(e, idx)} 
+                  className="p-2 bg-black/50 hover:bg-gold text-white rounded-full backdrop-blur-md transition-colors shadow-lg"
+                  title={post.isPlaceholder ? "Upload Image" : "Replace Image"}
+                >
+                   {uploadingSlot === idx ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                   ) : post.isPlaceholder ? (
+                      <Plus className="w-4 h-4" />
+                   ) : (
+                      <Edit2 className="w-4 h-4" />
+                   )}
+                </button>
+             </div>
+             
+             {/* Hover info overlay */}
+             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6 text-bone pointer-events-none">
+               <div className="flex items-center gap-2">
+                 <Heart className="w-5 h-5 fill-white" />
+                 <span className="font-bold">{post.likes}</span>
+               </div>
+               <div className="flex items-center gap-2">
+                 <MessageCircle className="w-5 h-5 fill-white" />
+                 <span className="font-bold">{idx * 3 + 4}</span>
+               </div>
+             </div>
+           </motion.div>
+         ))}
+       </div>
 
       {/* Post Modal */}
       <AnimatePresence>
         {selectedPost && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-12">
+            {/* Modal Overlay / Backdrop */}
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
@@ -201,10 +287,15 @@ export function Instagram() {
               className="relative w-full max-w-5xl h-[80vh] bg-abyss-panel rounded-lg overflow-hidden flex flex-col md:flex-row shadow-2xl border border-white/10 z-10"
             >
               <div className="w-full md:w-[60%] h-1/2 md:h-full bg-abyss-deep">
-                 <PostVisual type={selectedPost.type} index={selectedPost.id} />
+                 {selectedPost.imageUrl ? (
+                    <img src={selectedPost.imageUrl} className="w-full h-full object-cover" />
+                 ) : (
+                    <PostVisual type={selectedPost.type} index={selectedPost.id} />
+                 )}
               </div>
               
               <div className="w-full md:w-[40%] flex flex-col h-1/2 md:h-full bg-abyss-panel border-l border-white/5">
+                 {/* ... Modal Sidebar Content ... */}
                  <div className="p-4 border-b border-white/5 flex items-center justify-between">
                    <div className="flex items-center gap-3">
                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-abyss to-nebula/30" />

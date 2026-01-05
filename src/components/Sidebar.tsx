@@ -6,7 +6,8 @@ import {
   Youtube, 
   Music, 
   Download,
-  Disc
+  Disc,
+  Database
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
@@ -18,6 +19,7 @@ const navItems = [
   { path: '/youtube', label: 'YouTube', icon: Youtube },
   { path: '/soundcloud', label: 'SoundCloud', icon: Music },
   { path: '/exports', label: 'Exports', icon: Download },
+  { path: '/upload-matrix', label: 'Upload Matrix', icon: Database },
 ];
 
 export function Sidebar() {

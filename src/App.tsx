@@ -5,7 +5,7 @@ import { StyleGuide } from './pages/StyleGuide';
 import { Instagram } from './pages/Instagram';
 import { YouTube } from './pages/YouTube';
 import { SoundCloud } from './pages/SoundCloud';
-import { WebMock } from './pages/WebMock';
+import { UploadMatrix } from './components/UploadMatrix';
 import { Exports } from './pages/Exports';
 
 function App() {
@@ -18,8 +18,8 @@ function App() {
           <Route path="instagram" element={<Instagram />} />
           <Route path="youtube" element={<YouTube />} />
           <Route path="soundcloud" element={<SoundCloud />} />
-          <Route path="web" element={<WebMock />} />
           <Route path="exports" element={<Exports />} />
+          <Route path="upload-matrix" element={<UploadMatrix />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

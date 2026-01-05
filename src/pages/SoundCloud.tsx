@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
-import { Play, Heart, MoreHorizontal, MessageCircle, RefreshCw, BarChart2, Radio, Pencil, Share2, Link as LinkIcon, Star } from 'lucide-react';
+import { useMemo, useState, useRef } from 'react';
+import { Play, Heart, MoreHorizontal, MessageCircle, RefreshCw, BarChart2, Radio, Pencil, Share2, Link as LinkIcon, Star, Edit2, Loader2 } from 'lucide-react';
+import { useImageSystem } from '../hooks/useImageSystem';
 
 interface Track {
   id: number;
@@ -13,9 +14,10 @@ interface Track {
   reposts: string;
   comments: string;
   coverImage: string;
+  isPlaceholder?: boolean;
 }
 
-const tracks: Track[] = [
+const placeholderTracks: Track[] = [
   { 
     id: 1, 
     title: 'Frequency Session 20', 
@@ -27,7 +29,8 @@ const tracks: Track[] = [
     likes: '14',
     reposts: '2',
     comments: '1',
-    coverImage: '/images/cover (1).jpg'
+    coverImage: '/images/cover (1).jpg',
+    isPlaceholder: true
   },
   { 
     id: 2, 
@@ -40,7 +43,8 @@ const tracks: Track[] = [
     likes: '42',
     reposts: '8',
     comments: '5',
-    coverImage: '/images/cover (2).png'
+    coverImage: '/images/cover (2).png',
+    isPlaceholder: true
   },
   { 
     id: 3, 
@@ -53,7 +57,8 @@ const tracks: Track[] = [
     likes: '89',
     reposts: '12',
     comments: '8',
-    coverImage: '/images/cover (3).png'
+    coverImage: '/images/cover (3).png',
+    isPlaceholder: true
   },
     { 
     id: 4, 
@@ -66,7 +71,8 @@ const tracks: Track[] = [
     likes: '156',
     reposts: '24',
     comments: '18',
-    coverImage: '/images/cover (4).jpg'
+    coverImage: '/images/cover (4).jpg',
+    isPlaceholder: true
   },
   { 
     id: 5, 
@@ -79,13 +85,14 @@ const tracks: Track[] = [
     likes: '201',
     reposts: '45',
     comments: '22',
-    coverImage: '/images/cover (5).jpg'
+    coverImage: '/images/cover (5).jpg',
+    isPlaceholder: true
   },
 ];
 
 function Waveform() {
   // eslint-disable-next-line
-  const bars = useMemo(() => Array.from({ length: 60 }).map(() => Math.max(20, Math.random() * 100)), []);
+  const bars = useMemo(() => Array.from({ length: 60 }).map(() => Math.max(20, (Math.random() * 100))), []);
 
   return (
     <div className="flex items-end gap-[2px] h-12 w-full opacity-60">
@@ -100,17 +107,36 @@ function Waveform() {
   );
 }
 
-function TrackItem({ track }: { track: Track }) {
+interface TrackItemProps {
+    track: Track;
+    index: number;
+    onEdit: (index: number) => void;
+    isUploading: boolean;
+}
+
+function TrackItem({ track, index, onEdit, isUploading }: TrackItemProps) {
   return (
-    <div className="flex gap-4 p-4 hover:bg-white/5 rounded-lg transition-colors group">
+    <div className="flex gap-4 p-4 hover:bg-white/5 rounded-lg transition-colors group relative">
       {/* Cover Art */}
-      <div className="w-40 h-40 flex-shrink-0 bg-abyss-deep rounded shadow-lg overflow-hidden relative">
+      <div className="w-40 h-40 flex-shrink-0 bg-abyss-deep rounded shadow-lg overflow-hidden relative group/cover">
           <img src={track.coverImage} className="w-full h-full object-cover" alt={track.title} />
+          
           {/* Play Overlay */}
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/cover:opacity-100 transition-opacity cursor-pointer z-10">
              <div className="w-12 h-12 rounded-full bg-gold text-abyss flex items-center justify-center hover:scale-110 transition-transform">
                 <Play className="w-6 h-6 fill-current ml-1" />
              </div>
+          </div>
+
+          {/* Edit Overlay */}
+          <div className="absolute top-2 right-2 z-20 opacity-0 group-hover/cover:opacity-100 transition-opacity">
+              <button 
+                onClick={(e) => { e.stopPropagation(); onEdit(index); }}
+                className="p-1.5 bg-black/70 hover:bg-gold text-white rounded-full backdrop-blur-md transition-colors shadow-lg"
+                title="Change Cover Art"
+              >
+                 {isUploading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Edit2 className="w-3 h-3"/>}
+              </button>
           </div>
       </div>
 
@@ -164,9 +190,58 @@ function TrackItem({ track }: { track: Track }) {
 }
 
 export function SoundCloud() {
+  const { images, uploadImage } = useImageSystem('soundcloud');
+  const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeSlotRef = useRef<number | null>(null);
+
+  // Map tracks to images
+  const displayTracks: Track[] = placeholderTracks.map((placeholder, idx) => {
+      const existingImage = images.find(img => img.name === `soundcloud_track_${idx}`);
+      if (existingImage) {
+          return {
+              ...placeholder,
+              coverImage: existingImage.url,
+              isPlaceholder: false
+          };
+      }
+      return placeholder;
+  });
+
+  const handleEditClick = (index: number) => {
+      activeSlotRef.current = index;
+      fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const slot = activeSlotRef.current;
+      if (e.target.files && e.target.files[0] && slot !== null) {
+          setUploadingSlot(slot);
+          try {
+              const file = e.target.files[0];
+              await uploadImage(file, `soundcloud_track_${slot}`);
+          } catch (error) {
+              console.error("Cover upload failed", error);
+              alert("Error uploading cover.");
+          } finally {
+              setUploadingSlot(null);
+              if (fileInputRef.current) fileInputRef.current.value = '';
+          }
+      }
+  };
+
   return (
     <div className="animate-[fadeIn_0.5s_ease-out] min-h-screen text-bone font-sans pb-20">
       
+      {/* Hidden Global Input */}
+      <input 
+         type="file" 
+         ref={fileInputRef} 
+         className="hidden" 
+         accept="image/*"
+         onChange={handleFileChange}
+      />
+
       {/* HEADER SECTION */}
       <div className="relative mb-8 bg-abyss-panel group">
          {/* Banner */}
@@ -246,8 +321,14 @@ export function SoundCloud() {
 
              {/* Tracks List */}
              <div className="space-y-6">
-                 {tracks.map(track => (
-                    <TrackItem key={track.id} track={track} />
+                 {displayTracks.map((track, i) => (
+                    <TrackItem 
+                       key={track.id} 
+                       track={track} 
+                       index={i}
+                       onEdit={handleEditClick}
+                       isUploading={uploadingSlot === i}
+                    />
                  ))}
              </div>
           </div>

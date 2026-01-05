@@ -1,23 +1,82 @@
+import { useState, useRef } from 'react';
+import { useImageSystem } from '../hooks/useImageSystem';
+import { Plus, Edit2, Loader2 } from 'lucide-react';
+
 interface Video {
   id: number;
   title: string;
   views: string;
   date: string;
   duration: string;
+  thumbnailUrl?: string;
+  isPlaceholder?: boolean;
 }
 
-const videos: Video[] = [
-  { id: 1, title: 'Astrion - Frequency Session 21 [Live]', views: '124K', date: '2 weeks ago', duration: '1:04:20' },
-  { id: 2, title: 'Astrion - Deep Void Signals (Ambient Mix)', views: '45K', date: '1 month ago', duration: '45:00' },
-  { id: 3, title: 'Astrion - Frequency Session 20 [Live]', views: '89K', date: '2 months ago', duration: '58:12' },
-  { id: 4, title: 'Astrion - Transmutation Process', views: '12K', date: '3 months ago', duration: '08:45' },
-  { id: 5, title: 'Astrion - Frequency Session 19', views: '67K', date: '4 months ago', duration: '1:02:30' },
-  { id: 6, title: 'Astrion - Organic Core', views: '33K', date: '5 months ago', duration: '12:15' },
+const placeholderVideos: Video[] = [
+  { id: 1, title: 'Astrion - Frequency Session 21 [Live]', views: '124K', date: '2 weeks ago', duration: '1:04:20', isPlaceholder: true },
+  { id: 2, title: 'Astrion - Deep Void Signals (Ambient Mix)', views: '45K', date: '1 month ago', duration: '45:00', isPlaceholder: true },
+  { id: 3, title: 'Astrion - Frequency Session 20 [Live]', views: '89K', date: '2 months ago', duration: '58:12', isPlaceholder: true },
+  { id: 4, title: 'Astrion - Transmutation Process', views: '12K', date: '3 months ago', duration: '08:45', isPlaceholder: true },
+  { id: 5, title: 'Astrion - Frequency Session 19', views: '67K', date: '4 months ago', duration: '1:02:30', isPlaceholder: true },
+  { id: 6, title: 'Astrion - Organic Core', views: '33K', date: '5 months ago', duration: '12:15', isPlaceholder: true },
 ];
 
 export function YouTube() {
+  const { images, loading, uploadImage } = useImageSystem('youtube');
+  const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeSlotRef = useRef<number | null>(null);
+
+  // Mapped Videos: Combine Placeholders with Real Uploads
+  const displayVideos: Video[] = placeholderVideos.map((placeholder, idx) => {
+      // Find if we have an image for this slot
+      const existingImage = images.find(img => img.name === `youtube_video_${idx}`);
+      
+      if (existingImage) {
+          return {
+              ...placeholder,
+              thumbnailUrl: existingImage.url,
+              isPlaceholder: false,
+              title: `Uploaded Session ${idx + 1}`
+          };
+      }
+      return placeholder;
+  });
+
+  const handleUploadClick = (e: React.MouseEvent, slotIndex: number) => {
+      e.stopPropagation();
+      activeSlotRef.current = slotIndex;
+      fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const slot = activeSlotRef.current;
+      if (e.target.files && e.target.files[0] && slot !== null) {
+          setUploadingSlot(slot);
+          try {
+              const file = e.target.files[0];
+              await uploadImage(file, `youtube_video_${slot}`);
+          } catch (error) {
+              console.error("Video thumbnail upload failed", error);
+              alert("Error uploading thumbnail.");
+          } finally {
+              setUploadingSlot(null);
+              if (fileInputRef.current) fileInputRef.current.value = '';
+          }
+      }
+  };
+
   return (
     <div className="animate-[fadeIn_0.5s_ease-out]">
+      {/* Hidden Global Input */}
+      <input 
+         type="file" 
+         ref={fileInputRef} 
+         className="hidden" 
+         accept="image/*"
+         onChange={handleFileChange}
+      />
+
       {/* Channel Banner */}
       <div className="w-full aspect-[6/1] rounded-xl overflow-hidden mb-6 border border-white/5">
          <img 
@@ -46,7 +105,7 @@ export function YouTube() {
                   <span>•</span>
                   <span>5 subscribers</span>
                   <span>•</span>
-                  <span>11 videos</span>
+                  <span>{displayVideos.length} videos</span>
                </div>
             </div>
             
@@ -92,13 +151,19 @@ export function YouTube() {
       </div>
 
       {/* Video Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-8 px-4 pb-20">
-         {videos.map((video) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-8 px-4 pb-20 relative min-h-[200px]">
+          {loading && (
+             <div className="absolute inset-0 flex items-center justify-center bg-abyss/50 z-10 pointer-events-none">
+                 <div className="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+             </div>
+         )}
+
+         {displayVideos.map((video, idx) => (
             <div key={video.id} className="group cursor-pointer flex flex-col gap-3">
                {/* Thumbnail */}
-               <div className="aspect-video w-full rounded-xl overflow-hidden relative">
+               <div className="aspect-video w-full rounded-xl overflow-hidden relative border border-white/5 bg-abyss-deep">
                   <img 
-                    src="/images/coverart Youtube.png" 
+                    src={video.thumbnailUrl || "/images/coverart Youtube.png"}
                     alt="Video Thumbnail" 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -106,6 +171,23 @@ export function YouTube() {
                      {video.duration}
                   </div>
                   <div className="absolute bottom-0 left-0 h-1 bg-red-600 w-3/4" /> {/* Progress bar mock */}
+
+                  {/* Edit/Upload Button */}
+                  <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                     <button 
+                       onClick={(e) => handleUploadClick(e, idx)}
+                       className="p-1.5 bg-black/70 hover:bg-gold text-white rounded-full backdrop-blur-md transition-colors shadow-lg"
+                       title={video.isPlaceholder ? "Upload Thumbnail" : "Replace Thumbnail"}
+                     >
+                        {uploadingSlot === idx ? (
+                           <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : video.isPlaceholder ? (
+                           <Plus className="w-3 h-3" />
+                        ) : (
+                           <Edit2 className="w-3 h-3" />
+                        )}
+                     </button>
+                  </div>
                </div>
 
                {/* Info */}
