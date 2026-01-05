@@ -24,7 +24,7 @@ function CopyBlock({ label, text }: { label: string, text: string }) {
           )}
         >
           {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-          {copied ? 'COPIED' : 'COPY TEXT'}
+          {copied ? 'COPIADO' : 'COPIAR TEXTO'}
         </button>
       </div>
       <div className="bg-abyss-panel p-4 rounded-lg border border-white/5 font-mono text-sm text-bone/80 whitespace-pre-wrap leading-relaxed">
@@ -34,30 +34,51 @@ function CopyBlock({ label, text }: { label: string, text: string }) {
   );
 }
 
-function AssetCard({ title, type, size }: { title: string, type: string, size: string }) {
+interface AssetDownloadCardProps {
+  title: string;
+  type: string;
+  size: string;
+  imageSrc?: string;
+  downloadUrl: string;
+  fileName: string;
+}
+
+function AssetDownloadCard({ title, type, size, imageSrc, downloadUrl, fileName }: AssetDownloadCardProps) {
   return (
-    <div className="p-4 border border-white/5 bg-white/5 rounded-lg flex items-center justify-between group hover:bg-white/10 transition-colors cursor-pointer">
-       <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-abyss rounded flex items-center justify-center text-bone/50">
-             <FileText className="w-5 h-5" />
-          </div>
+    <div className="group border border-white/5 bg-white/5 rounded-lg overflow-hidden hover:bg-white/10 transition-all duration-300">
+       <div className="aspect-video w-full bg-abyss-deep relative overflow-hidden border-b border-white/5">
+          {imageSrc ? (
+            <img src={imageSrc} alt={title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-bone/20">
+               <FileText className="w-8 h-8" />
+            </div>
+          )}
+          
+          <a 
+            href={downloadUrl} 
+            download={fileName}
+            className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"
+          >
+             <Download className="w-8 h-8 text-gold" />
+          </a>
+       </div>
+       
+       <div className="p-3 flex justify-between items-start">
           <div>
-             <h4 className="text-sm font-medium text-bone">{title}</h4>
-             <p className="text-xs text-bone/40">{type} • {size}</p>
+             <h4 className="text-sm font-medium text-bone leading-tight mb-1">{title}</h4>
+             <p className="text-[10px] font-mono uppercase text-bone/40 tracking-wider bg-black/20 inline-block px-1.5 py-0.5 rounded">{type} • {size}</p>
           </div>
        </div>
-       <button className="text-bone/30 group-hover:text-gold transition-colors">
-          <Download className="w-5 h-5" />
-       </button>
     </div>
   );
 }
 
 export function Exports() {
-  const toneOfVoice = `Tone: calm, precise, selective.
-No emojis.
-No hype.
-Examples:
+  const toneOfVoice = `Tono: calmado, preciso, selectivo.
+Sin emojis.
+Sin hype.
+Ejemplos:
 - "Frequency Session 21. Un nuevo pulso."
 - "No es música. Es resonancia."
 - "Deep frequencies. Controlled energy."`;
@@ -71,38 +92,181 @@ Examples:
 2x Booth Monitors (High Quality)`;
 
   return (
-    <div className="animate-[fadeIn_0.5s_ease-out] max-w-4xl mx-auto space-y-16">
+    <div className="animate-[fadeIn_0.5s_ease-out] max-w-6xl mx-auto space-y-20 pb-20">
       <PageHeader 
-        title="Exports & Assets" 
-        subtitle="Download guidelines and copy-paste resources." 
+        title="Exportaciones y Recursos" 
+        subtitle="Centro de descarga de activos de marca, guías y recursos visuales." 
       />
 
-      <section className="space-y-6">
-        <h2 className="text-xl font-display uppercase tracking-widest text-gold/80 border-b border-gold/20 pb-2 mb-8">
-          01 // Communications
+      {/* 01. Communications */}
+      <section className="space-y-8">
+        <h2 className="text-xl font-display uppercase tracking-widest text-gold/80 border-b border-gold/20 pb-4">
+          01 // Comunicaciones y Textos
         </h2>
-        <div className="grid gap-8">
-           <CopyBlock label="Tone of Voice Rules" text={toneOfVoice} />
-           <CopyBlock label="Booker Statement (ES)" text={bookerStatement} />
-           <CopyBlock label="Technical Rider Summary" text={riderTech} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+           <div className="space-y-6">
+              <CopyBlock label="Reglas de Tono de Voz" text={toneOfVoice} />
+              <CopyBlock label="Resumen de Rider Técnico" text={riderTech} />
+           </div>
+           <div>
+              <CopyBlock label="Statement para Bookers (ES)" text={bookerStatement} />
+           </div>
         </div>
       </section>
 
-      <section className="space-y-6">
-        <h2 className="text-xl font-display uppercase tracking-widest text-gold/80 border-b border-gold/20 pb-2 mb-8">
-          02 // Downloadable Assets
+      {/* 02. Digital Assets Layer */}
+      <section className="space-y-12">
+        <h2 className="text-xl font-display uppercase tracking-widest text-gold/80 border-b border-gold/20 pb-4">
+          02 // Activos Digitales y Visuales
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-           <div className="p-6 border border-dashed border-white/10 rounded-lg text-center space-y-2">
-              <span className="text-bone/40 text-sm">Brand_Pack_2025.zip</span>
-              <button className="bg-bone text-abyss px-4 py-2 rounded font-medium text-sm w-full hover:bg-white transition-colors">
-                 Download All (45MB)
-              </button>
+
+        {/* INSTAGRAM SECTION */}
+        <div className="space-y-6">
+           <div className="flex items-center gap-3 mb-6">
+              <div className="w-8 h-8 rounded bg-gradient-to-tr from-purple-500/20 to-orange-500/20 flex items-center justify-center border border-white/10">
+                 {/* Lucide Instagram icon or generic text */}
+                 <span className="font-display font-bold text-bone">IG</span>
+              </div>
+              <h3 className="text-lg font-medium text-bone">Instagram System</h3>
            </div>
-           <div className="space-y-2">
-              <AssetCard title="Logo Mark (Vector)" type="SVG" size="12kb" />
-              <AssetCard title="Wordmark (Vector)" type="SVG" size="15kb" />
-              <AssetCard title="Social Media Kit" type="FIG" size="24MB" />
+           
+           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {/* Logo */}
+              <div className="col-span-2">
+                 <AssetDownloadCard 
+                   title="Profile Picture (Logo)" 
+                   type="PNG" 
+                   size="1.8MB" 
+                   imageSrc="/images/Logo IG.png"
+                   downloadUrl="/images/Logo IG.png"
+                   fileName="Astrion_Profile_Logo.png"
+                 />
+              </div>
+
+              {/* Stories Highlights */}
+              {[1, 2, 3, 4, 5].map(num => (
+                 <AssetDownloadCard 
+                   key={num}
+                   title={`Highlight 0${num}`} 
+                   type="PNG" 
+                   size="~1MB" 
+                   imageSrc={`/images/historia (${num}).png`}
+                   downloadUrl={`/images/historia (${num}).png`}
+                   fileName={`Astrion_Highlight_0${num}.png`}
+                 />
+              ))}
+
+              {/* Feed Grid Placeholders - representing the 12 posts */}
+              {Array.from({length: 4}).map((_, i) => (
+                  <div key={i} className="opacity-50 pointer-events-none grayscale">
+                    <AssetDownloadCard 
+                       title={`Feed Mock 0${i+1}`} 
+                       type="JPG" 
+                       size="Mock" 
+                       // No image src for now, just placeholder
+                       downloadUrl="#" 
+                       fileName="#"
+                    />
+                  </div>
+              ))}
+           </div>
+        </div>
+
+        {/* YOUTUBE SECTION */}
+        <div className="space-y-6 pt-12 border-t border-white/5">
+           <div className="flex items-center gap-3 mb-6">
+              <div className="w-8 h-8 rounded bg-gradient-to-tr from-red-600/20 to-red-900/20 flex items-center justify-center border border-white/10">
+                 <span className="font-display font-bold text-bone">YT</span>
+              </div>
+              <h3 className="text-lg font-medium text-bone">YouTube System</h3>
+           </div>
+
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Channel Banner - Large */}
+              <div className="md:col-span-3">
+                 <div className="border border-white/5 bg-white/5 rounded-lg overflow-hidden group hover:border-gold/30 transition-colors relative">
+                    <img src="/images/banneryoutube.png" className="w-full h-48 md:h-64 object-cover" alt="Banner" />
+                    <a 
+                      href="/images/banneryoutube.png" 
+                      download="Astrion_YouTube_Banner.png"
+                      className="absolute bottom-4 right-4 bg-abyss-panel border border-white/10 px-4 py-2 rounded text-sm font-medium text-bone hover:bg-gold hover:text-abyss transition-colors flex items-center gap-2"
+                    >
+                       <Download className="w-4 h-4" /> Download Banner
+                    </a>
+                 </div>
+              </div>
+
+              {/* Video Covers - 6 Mocks */}
+              {Array.from({length: 6}).map((_, i) => (
+                 <AssetDownloadCard 
+                   key={i}
+                   title={`Video Thumbnail Vol. ${i+1}`} 
+                   type="PNG" 
+                   size="5.4MB" 
+                   imageSrc="/images/coverart Youtube.png"
+                   downloadUrl="/images/coverart Youtube.png"
+                   fileName={`Astrion_Thumbnail_Vol${i+1}.png`}
+                 />
+              ))}
+           </div>
+        </div>
+
+        {/* SOUNDCLOUD SECTION */}
+        <div className="space-y-6 pt-12 border-t border-white/5">
+           <div className="flex items-center gap-3 mb-6">
+              <div className="w-8 h-8 rounded bg-gradient-to-tr from-orange-600/20 to-orange-900/20 flex items-center justify-center border border-white/10">
+                 <span className="font-display font-bold text-bone">SC</span>
+              </div>
+              <h3 className="text-lg font-medium text-bone">SoundCloud System</h3>
+           </div>
+
+           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+               {/* SC Banner - Large */}
+              <div className="md:col-span-4">
+                 <div className="border border-white/5 bg-white/5 rounded-lg overflow-hidden group hover:border-gold/30 transition-colors relative">
+                    <img src="/images/bannerSoundcloud.png" className="w-full h-48 md:h-64 object-cover" alt="SC Banner" />
+                    <a 
+                      href="/images/bannerSoundcloud.png" 
+                      download="Astrion_SoundCloud_Banner.png"
+                      className="absolute bottom-4 right-4 bg-abyss-panel border border-white/10 px-4 py-2 rounded text-sm font-medium text-bone hover:bg-gold hover:text-abyss transition-colors flex items-center gap-2"
+                    >
+                       <Download className="w-4 h-4" /> Download Banner
+                    </a>
+                 </div>
+              </div>
+
+               {/* Profile Picture */}
+               <div className="md:col-span-1">
+                  <AssetDownloadCard 
+                   title="Profile Picture" 
+                   type="PNG" 
+                   size="1.8MB" 
+                   imageSrc="/images/Logo IG.png"
+                   downloadUrl="/images/Logo IG.png"
+                   fileName="Astrion_SC_Profile.png"
+                 />
+               </div>
+
+              {/* Track Covers */}
+              <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                 {[
+                    { id: 1, type: 'JPG', path: '/images/cover (1).jpg' },
+                    { id: 2, type: 'PNG', path: '/images/cover (2).png' },
+                    { id: 3, type: 'PNG', path: '/images/cover (3).png' },
+                    { id: 4, type: 'JPG', path: '/images/cover (4).jpg' },
+                    { id: 5, type: 'JPG', path: '/images/cover (5).jpg' },
+                 ].map((cover) => (
+                    <AssetDownloadCard 
+                      key={cover.id}
+                      title={`Track Cover Vol. 0${cover.id}`} 
+                      type={cover.type} 
+                      size="High Res" 
+                      imageSrc={cover.path}
+                      downloadUrl={cover.path}
+                      fileName={`Astrion_Cover_0${cover.id}.${cover.type.toLowerCase()}`}
+                    />
+                 ))}
+              </div>
            </div>
         </div>
       </section>

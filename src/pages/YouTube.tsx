@@ -1,137 +1,134 @@
-import { PageHeader } from '../components/PageHeader';
-
 interface Video {
   id: number;
   title: string;
   views: string;
   date: string;
-  style: 'RITUAL' | 'PULSE';
+  duration: string;
 }
 
 const videos: Video[] = [
-  { id: 1, title: 'Astrion - Frequency Session 21 [Live]', views: '124K views', date: '2 weeks ago', style: 'RITUAL' },
-  { id: 2, title: 'Astrion - Deep Void Signals (Ambient Mix)', views: '45K views', date: '1 month ago', style: 'PULSE' },
-  { id: 3, title: 'Astrion - Frequency Session 20 [Live]', views: '89K views', date: '2 months ago', style: 'RITUAL' },
-  { id: 4, title: 'Astrion - Transmutation Process', views: '12K views', date: '3 months ago', style: 'PULSE' },
-  { id: 5, title: 'Astrion - Frequency Session 19', views: '67K views', date: '4 months ago', style: 'RITUAL' },
-  { id: 6, title: 'Astrion - Organic Core', views: '33K views', date: '5 months ago', style: 'PULSE' },
+  { id: 1, title: 'Astrion - Frequency Session 21 [Live]', views: '124K', date: '2 weeks ago', duration: '1:04:20' },
+  { id: 2, title: 'Astrion - Deep Void Signals (Ambient Mix)', views: '45K', date: '1 month ago', duration: '45:00' },
+  { id: 3, title: 'Astrion - Frequency Session 20 [Live]', views: '89K', date: '2 months ago', duration: '58:12' },
+  { id: 4, title: 'Astrion - Transmutation Process', views: '12K', date: '3 months ago', duration: '08:45' },
+  { id: 5, title: 'Astrion - Frequency Session 19', views: '67K', date: '4 months ago', duration: '1:02:30' },
+  { id: 6, title: 'Astrion - Organic Core', views: '33K', date: '5 months ago', duration: '12:15' },
 ];
-
-function VideoThumbnail({ video }: { video: Video }) {
-  return (
-    <div className="group cursor-pointer">
-      <div className="aspect-video bg-abyss-deep rounded-xl overflow-hidden relative mb-3 border border-white/5 transition-transform duration-300 group-hover:-translate-y-1">
-        {/* Thumbnail Visual Generation */}
-        {video.style === 'RITUAL' ? (
-          <div className="absolute inset-0 bg-abyss flex items-center justify-center">
-             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-nebula/20 via-abyss-deep to-abyss opacity-60" />
-             <div className="z-10 text-center">
-                <div className="w-12 h-12 rounded-full border border-bone/20 mx-auto mb-2 flex items-center justify-center">
-                   <div className="w-1 h-1 bg-gold rounded-full" />
-                </div>
-                <span className="text-bone/40 text-xs tracking-widest uppercase">Ritual Mode</span>
-             </div>
-             <div className="absolute bottom-2 right-2 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-medium text-white">
-               1:04:20
-             </div>
-          </div>
-        ) : (
-           <div className="absolute inset-0 bg-gradient-to-br from-night to-abyss-deep overflow-hidden">
-              <div className="absolute -right-10 -top-10 w-40 h-40 bg-nebula/30 blur-3xl rounded-full mix-blend-screen" />
-              <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-gold/10 blur-3xl rounded-full mix-blend-screen" />
-              <div className="absolute bottom-4 left-4 border-l-2 border-gold pl-3">
-                 <span className="text-gold/80 text-xs font-mono uppercase tracking-widest">Pulse</span>
-              </div>
-              <div className="absolute bottom-2 right-2 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-medium text-white">
-               45:00
-             </div>
-           </div>
-        )}
-      </div>
-      
-      <div className="flex gap-3">
-         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-abyss to-nebula/40 flex-shrink-0" />
-         <div>
-            <h3 className="font-medium text-bone leading-tight group-hover:text-white transition-colors">
-              {video.title}
-            </h3>
-            <div className="text-bone/40 text-xs mt-1 space-y-0.5">
-               <p>Astrion</p>
-               <p>{video.views} • {video.date}</p>
-            </div>
-         </div>
-      </div>
-    </div>
-  );
-}
 
 export function YouTube() {
   return (
     <div className="animate-[fadeIn_0.5s_ease-out]">
-      <PageHeader 
-        title="YouTube Channel" 
-        subtitle="Frequency Sessions and visual narratives." 
-      />
-
       {/* Channel Banner */}
-      <div className="w-full h-48 md:h-64 rounded-2xl bg-gradient-to-r from-abyss-deep via-night to-abyss-deep border border-white/5 relative overflow-hidden mb-8 flex items-center justify-center">
-         <div className="absolute inset-0 bg-noise opacity-20" />
-         <div className="text-center space-y-2 z-10">
-            <h1 className="text-4xl md:text-6xl font-display font-medium text-bone tracking-widest uppercase opacity-90 mix-blend-overlay">
-               Astrion
-            </h1>
-            <p className="text-xs font-mono text-gold tracking-[1em] uppercase opacity-60">
-               Official Channel
-            </p>
+      <div className="w-full aspect-[6/1] rounded-xl overflow-hidden mb-6 border border-white/5">
+         <img 
+           src="/images/banneryoutube.png" 
+           alt="Channel Banner" 
+           className="w-full h-full object-cover"
+         />
+      </div>
+
+      {/* Channel Header Info */}
+      <div className="flex flex-col md:flex-row gap-6 mb-8 px-4">
+         {/* Avatar */}
+         <div className="flex-shrink-0">
+             <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-abyss-panel">
+                {/* Visual placeholder for avatar based on screenshot - gold geometric */}
+                <img src="/images/Logo IG.png" className="w-full h-full object-cover" alt="Avatar" />
+             </div>
          </div>
-         {/* Subscribe Button Mock */}
-         <div className="absolute bottom-6 right-8">
-            <button className="bg-bone text-abyss font-medium px-6 py-2 rounded-full text-sm hover:bg-white transition-colors">
-               Subscribe
-            </button>
+
+         {/* Info */}
+         <div className="flex-1 space-y-3 pt-2">
+            <div>
+               <h1 className="text-4xl font-display font-medium text-bone mb-1">Astrion Music</h1>
+               <div className="text-bone/60 text-sm flex items-center gap-2">
+                  <span className="font-medium">@AstrionDjMusic</span>
+                  <span>•</span>
+                  <span>5 subscribers</span>
+                  <span>•</span>
+                  <span>11 videos</span>
+               </div>
+            </div>
+            
+            <div className="text-bone/60 text-sm max-w-2xl cursor-pointer hover:text-bone">
+               <p className="line-clamp-1">
+                  Astrion is a DJ and producer specializing in Progressive House, Melodic Techno, and sets... <span className="font-medium text-bone">more</span>
+               </p>
+               <a href="#" className="text-gold/80 hover:text-gold mt-1 block font-medium">astrionmusic.netlify.app</a>
+            </div>
+
+            <div className="flex gap-3 pt-1">
+               <button className="px-4 py-2 bg-white/10 hover:bg-white/20 text-bone text-sm font-medium rounded-full transition-colors">
+                  Customize channel
+               </button>
+               <button className="px-4 py-2 bg-white/10 hover:bg-white/20 text-bone text-sm font-medium rounded-full transition-colors">
+                  Manage videos
+               </button>
+            </div>
          </div>
       </div>
 
-      {/* Shelf */}
-      <div className="mb-8 flex items-center gap-6 overflow-x-auto pb-4 border-b border-white/5 no-scrollbar">
-         {['Home', 'Videos', 'Live', 'Playlists', 'Community', 'Channels', 'About'].map((tab, i) => (
-            <button key={tab} className={`text-sm font-medium whitespace-nowrap ${i === 0 ? 'text-bone border-b-2 border-bone pb-4 -mb-4.5' : 'text-bone/50 hover:text-bone/80'}`}>
+      {/* Tabs */}
+      <div className="flex gap-8 border-b border-white/10 px-4 mb-6 sticky top-0 bg-abyss/95 backdrop-blur z-30">
+         {['Videos', 'Playlists', 'Posts'].map((tab, i) => (
+            <button key={tab} className={`pb-3 text-sm font-medium border-b-2 uppercase tracking-wide transition-colors ${i === 0 ? 'border-bone text-bone' : 'border-transparent text-bone/60 hover:text-bone'}`}>
                {tab}
             </button>
          ))}
+         <button className="pb-3 text-bone/60 hover:text-bone">
+             {/* Search icon placeholder */}
+             <span className="sr-only">Search</span>
+             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+         </button>
       </div>
 
-      <div className="space-y-4 mb-6">
-         <h2 className="text-xl font-medium text-bone">Latest Releases</h2>
-      </div>
-
-      {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8">
-         {videos.map(video => (
-            <VideoThumbnail key={video.id} video={video} />
+      {/* Filter Chips */}
+      <div className="flex gap-3 px-4 mb-8">
+         {['Latest', 'Popular', 'Oldest'].map((filter, i) => (
+            <button key={filter} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${i === 0 ? 'bg-bone text-abyss' : 'bg-white/10 text-bone hover:bg-white/20'}`}>
+               {filter}
+            </button>
          ))}
       </div>
 
-      <div className="mt-16 pt-8 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 gap-8">
-         <div>
-            <h3 className="text-gold font-mono text-xs uppercase tracking-widest mb-4">Thumbnail Rules</h3>
-            <ul className="space-y-4 text-sm text-bone/60">
-               <li className="flex gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gold mt-1.5"></span>
-                  <p><strong className="text-bone">Ritual Style:</strong> Minimalist. Use heavy negative space. Center alignment. Focus on the geometry.</p>
-               </li>
-               <li className="flex gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gold mt-1.5"></span>
-                  <p><strong className="text-bone">Pulse Style:</strong> Abstract gradients. Use Nebula Violet and Night Blue. Off-center composition.</p>
-               </li>
-            </ul>
-         </div>
-         <div className="bg-abyss-panel p-6 rounded-xl border border-white/5 flex items-center justify-center">
-            <p className="text-bone/30 text-center italic text-sm">
-               "The thumbnail is the first frequencies the eye receives. Keep it clean."
-            </p>
-         </div>
+      {/* Video Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-8 px-4 pb-20">
+         {videos.map((video) => (
+            <div key={video.id} className="group cursor-pointer flex flex-col gap-3">
+               {/* Thumbnail */}
+               <div className="aspect-video w-full rounded-xl overflow-hidden relative">
+                  <img 
+                    src="/images/coverart Youtube.png" 
+                    alt="Video Thumbnail" 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/80 text-[10px] font-medium text-white rounded">
+                     {video.duration}
+                  </div>
+                  <div className="absolute bottom-0 left-0 h-1 bg-red-600 w-3/4" /> {/* Progress bar mock */}
+               </div>
+
+               {/* Info */}
+               <div className="flex gap-3">
+                  <div className="flex-1">
+                     <h3 className="text-sm font-medium text-bone leading-tight line-clamp-2 group-hover:text-white mb-1">
+                        {video.title}
+                     </h3>
+                     <div className="text-xs text-bone/60 flex flex-col">
+                        <span>{video.views} views • {video.date}</span>
+                     </div>
+                  </div>
+                  <div className="flex-shrink-0 pt-0.5">
+                      {/* 3 dots icon */}
+                      <div className="w-1 h-1 bg-bone/60 rounded-full mb-1" />
+                      <div className="w-1 h-1 bg-bone/60 rounded-full mb-1" />
+                      <div className="w-1 h-1 bg-bone/60 rounded-full" />
+                  </div>
+               </div>
+            </div>
+         ))}
       </div>
     </div>
   );
 }
+

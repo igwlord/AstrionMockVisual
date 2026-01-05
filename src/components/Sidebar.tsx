@@ -44,45 +44,46 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 py-6 px-4 space-y-2 z-10 overflow-y-auto no-scrollbar">
+      <nav className="flex-1 py-6 px-4 space-y-1 z-10 overflow-y-auto no-scrollbar">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             className={({ isActive }) => clsx(
-              "group relative flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all duration-300",
+              "group relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-colors duration-300",
               isActive 
-                ? "text-bone bg-white/5 border border-white/5 shadow-sm" 
-                : "text-bone/40 hover:text-bone hover:bg-white/5 hover:translate-x-1"
+                ? "text-bone font-medium" 
+                : "text-bone/40 hover:text-bone/70"
             )}
           >
             {({ isActive }) => (
               <>
-                <span className={clsx(
-                  "absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full bg-gold transition-all duration-300",
-                  isActive ? "opacity-100 scale-y-100" : "opacity-0 scale-y-0"
-                )} />
-                
-                <item.icon className={clsx(
-                  "w-4 h-4 transition-colors duration-300",
-                  isActive ? "text-gold" : "text-current"
-                )} />
-                
-                <span className={clsx(
-                  "font-medium tracking-wide transition-all duration-300",
-                  isActive ? "translate-x-1" : ""
-                )}>
-                  {item.label}
-                </span>
-
+                {/* Subtle Background Highlight */}
                 {isActive && (
                    <motion.div 
-                     layoutId="active-glow"
-                     className="absolute inset-0 rounded-lg bg-gold/5 pointer-events-none"
+                     layoutId="active-bg"
+                     className="absolute inset-0 rounded-lg bg-white/5 pointer-events-none"
                      initial={false}
-                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                     transition={{ type: "spring", stiffness: 400, damping: 35 }}
                    />
                 )}
+
+                {/* Accent Dot */}
+                <div className="relative z-10 flex items-center gap-3">
+                  <span className={clsx(
+                    "w-1 h-1 rounded-full transition-all duration-300",
+                    isActive ? "bg-gold scale-100" : "bg-transparent scale-0 group-hover:bg-white/10 group-hover:scale-100"
+                  )} />
+                  
+                  <item.icon className={clsx(
+                    "w-4 h-4 transition-colors duration-300",
+                    isActive ? "text-gold" : "text-current group-hover:text-bone/80"
+                  )} />
+                  
+                  <span className="tracking-wide">
+                    {item.label}
+                  </span>
+                </div>
               </>
             )}
           </NavLink>

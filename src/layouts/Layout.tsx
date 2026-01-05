@@ -33,7 +33,7 @@ export function Layout() {
           togglePresentationMode={() => setPresentationMode(!presentationMode)} 
         />
         
-        <div className="pt-24 px-8 pb-12 max-w-7xl mx-auto">
+        <div className="pt-20 px-8 pb-12 max-w-7xl mx-auto">
           <Outlet />
         </div>
       </main>

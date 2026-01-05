@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { PageHeader } from '../components/PageHeader';
 import { Grid, Heart, MessageCircle, Share2, X, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -71,36 +70,81 @@ export function Instagram() {
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
-      <PageHeader 
-        title="Instagram Feed" 
-        subtitle="The 21-day cycle visual grid." 
-      />
+      <div className="flex flex-col gap-4 pt-4">
+           {/* Profile Header */}
+           <div className="flex items-center gap-8 md:gap-12 pl-4 md:pl-8">
+              <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border border-white/10 bg-gradient-to-br from-abyss-deep to-abyss p-1">
+                 <div className="w-full h-full rounded-full bg-abyss flex items-center justify-center border border-white/5 overflow-hidden">
+                    <img src="/images/Logo IG.png" alt="Astrion Logo" className="w-full h-full object-cover" />
+                 </div>
+              </div>
+              
+              <div className="space-y-4">
+                 <div className="flex items-center gap-4">
+                    <h2 className="text-xl font-medium text-bone">astrion.official</h2>
+                    <button className="px-4 py-1.5 bg-white/5 hover:bg-white/10 rounded text-sm font-medium text-bone transition-colors">
+                       Edit Profile
+                    </button>
+                 </div>
+                 
+                 <div className="flex items-center gap-8 text-sm">
+                    <span><span className="font-bold text-bone">21</span> <span className="text-bone/60">posts</span></span>
+                    <span><span className="font-bold text-bone">12.5k</span> <span className="text-bone/60">followers</span></span>
+                    <span><span className="font-bold text-bone">42</span> <span className="text-bone/60">following</span></span>
+                 </div>
+                 
+                 <div>
+                    <div className="text-sm font-medium text-bone/90">Organismo sonoro · Frecuencia contenida</div>
+                    <a href="#" className="text-sm text-bone/50 hover:text-gold transition-colors">linktr.ee/astrion</a>
+                 </div>
+              </div>
+           </div>
 
-      {/* Grid Stats Mock */}
-      <div className="flex gap-8 mb-12 border-b border-white/5 pb-8">
-        <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-abyss to-nebula/30 p-1">
-          <div className="w-full h-full rounded-full bg-abyss-panel flex items-center justify-center border border-white/10">
-            <span className="font-display font-bold text-xl">A</span>
-          </div>
+           {/* Highlighted Stories (Historias Destacadas) */}
+           <div className="flex gap-6 md:gap-8 px-4 md:pl-8 py-6 overflow-x-auto no-scrollbar">
+              
+              {/* EON: Origen */}
+              <div className="flex flex-col items-center gap-2 group cursor-pointer">
+                 <div className="w-16 h-16 rounded-full border border-white/5 bg-abyss flex items-center justify-center relative overflow-hidden group-hover:border-gold/30 transition-colors p-0.5">
+                    <img src="/images/historia (1).png" alt="EON" className="w-full h-full rounded-full object-cover" />
+                 </div>
+                 <span className="text-[10px] font-mono tracking-widest text-bone/50 uppercase group-hover:text-bone/80 transition-colors">EON</span>
+              </div>
+
+              {/* TRNS: Transmisión */}
+              <div className="flex flex-col items-center gap-2 group cursor-pointer">
+                 <div className="w-16 h-16 rounded-full border border-white/5 bg-abyss flex items-center justify-center relative overflow-hidden group-hover:border-bone/30 transition-colors p-0.5">
+                    <img src="/images/historia (2).png" alt="TRNS" className="w-full h-full rounded-full object-cover" />
+                 </div>
+                 <span className="text-[10px] font-mono tracking-widest text-bone/50 uppercase group-hover:text-bone/80 transition-colors">TRNS</span>
+              </div>
+
+              {/* HZ: Frecuencia */}
+              <div className="flex flex-col items-center gap-2 group cursor-pointer">
+                 <div className="w-16 h-16 rounded-full border border-white/5 bg-abyss flex items-center justify-center relative overflow-hidden group-hover:border-nebula/30 transition-colors p-0.5">
+                     <img src="/images/historia (3).png" alt="HZ" className="w-full h-full rounded-full object-cover" />
+                 </div>
+                 <span className="text-[10px] font-mono tracking-widest text-bone/50 uppercase group-hover:text-bone/80 transition-colors">HZ</span>
+              </div>
+
+              {/* LOG: Registro */}
+              <div className="flex flex-col items-center gap-2 group cursor-pointer">
+                 <div className="w-16 h-16 rounded-full border border-white/5 bg-abyss flex items-center justify-center relative overflow-hidden group-hover:border-white/30 transition-colors p-0.5">
+                     <img src="/images/historia (4).png" alt="LOG" className="w-full h-full rounded-full object-cover" />
+                 </div>
+                 <span className="text-[10px] font-mono tracking-widest text-bone/50 uppercase group-hover:text-bone/80 transition-colors">LOG</span>
+              </div>
+
+              {/* TRVL: Deriva */}
+              <div className="flex flex-col items-center gap-2 group cursor-pointer">
+                 <div className="w-16 h-16 rounded-full border border-white/5 bg-abyss flex items-center justify-center relative overflow-hidden group-hover:border-white/20 transition-colors p-0.5">
+                     <img src="/images/historia (5).png" alt="TRVL" className="w-full h-full rounded-full object-cover" />
+                 </div>
+                 <span className="text-[10px] font-mono tracking-widest text-bone/50 uppercase group-hover:text-bone/80 transition-colors">TRVL</span>
+              </div>
+
+           </div>
         </div>
-        <div className="flex-1 flex flex-col justify-center space-y-4">
-           <div className="flex items-center gap-6">
-             <h2 className="text-xl font-medium">astrion.official</h2>
-             <button className="px-4 py-1.5 rounded bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors">
-               Edit Profile
-             </button>
-           </div>
-           <div className="flex gap-8 text-sm">
-             <span><strong className="text-bone">21</strong> posts</span>
-             <span><strong className="text-bone">12.5k</strong> followers</span>
-             <span><strong className="text-bone">42</strong> following</span>
-           </div>
-           <div className="text-sm text-bone/80 max-w-md">
-             <p>Organismo sonoro · Frecuencia contenida</p>
-             <p className="font-mono text-xs text-gold/80 mt-1">linktr.ee/astrion</p>
-           </div>
-        </div>
-      </div>
 
       {/* Tabs */}
       <div className="flex justify-center gap-12 border-t border-white/5 mb-8">
