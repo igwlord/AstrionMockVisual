@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Instagram, Youtube, Music, Globe, ArrowRight, type LucideIcon } from 'lucide-react';
-
+import { Instagram, Youtube, Music, ArrowRight, type LucideIcon, FileText } from 'lucide-react';
+import { BrandManifesto } from '../components/BrandManifesto';
 
 
 function LinkCard({ to, icon: Icon, title, desc }: { to: string, icon: LucideIcon, title: string, desc: string }) {
@@ -19,6 +20,8 @@ function LinkCard({ to, icon: Icon, title, desc }: { to: string, icon: LucideIco
 }
 
 export function Overview() {
+  const [isManifestoOpen, setIsManifestoOpen] = useState(false);
+
   return (
     <div className="animate-[fadeIn_0.5s_ease-out] space-y-20 pb-12">
       {/* Hero */}
@@ -44,8 +47,18 @@ export function Overview() {
                <br/><br/>
                Este Sistema Operativo define las leyes visuales y sonoras del ecosistema Astrion.
             </p>
+            
+            <button 
+               onClick={() => setIsManifestoOpen(true)}
+               className="inline-flex items-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-bone transition-all group"
+            >
+               <FileText className="w-4 h-4 text-gold group-hover:scale-110 transition-transform" />
+               <span className="text-sm font-medium tracking-wide">LEER PROTOCOLO DE MARCA</span>
+            </button>
          </div>
       </div>
+
+      <BrandManifesto isOpen={isManifestoOpen} onClose={() => setIsManifestoOpen(false)} />
 
       {/* Quick Links */}
       <section className="space-y-6">
@@ -56,7 +69,6 @@ export function Overview() {
             <LinkCard to="/instagram" icon={Instagram} title="Instagram" desc="Grilla Visual y Ciclo de 21 Días" />
             <LinkCard to="/youtube" icon={Youtube} title="YouTube" desc="Sesiones de Frecuencia y Visuales" />
             <LinkCard to="/soundcloud" icon={Music} title="SoundCloud" desc="Señales de Audio y Sets" />
-            <LinkCard to="/web" icon={Globe} title="Web Experience" desc="Nodo Central y Landing" />
          </div>
       </section>
     </div>

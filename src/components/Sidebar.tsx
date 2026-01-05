@@ -5,7 +5,6 @@ import {
   Instagram, 
   Youtube, 
   Music, 
-  Globe, 
   Download,
   Disc
 } from 'lucide-react';
@@ -18,7 +17,6 @@ const navItems = [
   { path: '/instagram', label: 'Instagram', icon: Instagram },
   { path: '/youtube', label: 'YouTube', icon: Youtube },
   { path: '/soundcloud', label: 'SoundCloud', icon: Music },
-  { path: '/web', label: 'Web Mock', icon: Globe },
   { path: '/exports', label: 'Exports', icon: Download },
 ];
 
