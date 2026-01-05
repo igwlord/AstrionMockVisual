@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  color-scheme: dark;
+  color: #E6E2DA; /* Bone White */
+  background-color: #0B0A14; /* Abyss Violet 1 */
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center; /* VITE Default override needed? Usually no for full app */
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+/* Reset VITE default centring if it exists */
+body {
+    display: block;
+    place-items: unset;
+}
+
+@layer utilities {
+    .animate-pulse-slow {
+        animation: pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+}
