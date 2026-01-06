@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, ReactNode } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface TooltipProps {
@@ -20,10 +21,9 @@ export function Tooltip({
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState<{ top?: number; left?: number; right?: number; bottom?: number }>({});
-  const [actualSide, setActualSide] = useState(side);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   const showTooltip = () => {
     if (disabled) return;
@@ -52,7 +52,6 @@ export function Tooltip({
       height: window.innerHeight
     };
 
-    let newSide = side;
     let top = 0;
     let left = 0;
     let right = 0;
@@ -64,7 +63,6 @@ export function Tooltip({
         top = rect.top - tooltipRect.height - 8;
         left = rect.left + rect.width / 2 - tooltipRect.width / 2;
         if (top < 0) {
-          newSide = 'bottom';
           top = rect.bottom + 8;
         }
         if (left < 0) left = 8;
@@ -76,7 +74,6 @@ export function Tooltip({
         top = rect.bottom + 8;
         left = rect.left + rect.width / 2 - tooltipRect.width / 2;
         if (top + tooltipRect.height > viewport.height) {
-          newSide = 'top';
           top = rect.top - tooltipRect.height - 8;
         }
         if (left < 0) left = 8;
@@ -88,7 +85,6 @@ export function Tooltip({
         left = rect.left - tooltipRect.width - 8;
         top = rect.top + rect.height / 2 - tooltipRect.height / 2;
         if (left < 0) {
-          newSide = 'right';
           left = rect.right + 8;
         }
         if (top < 0) top = 8;
@@ -100,7 +96,6 @@ export function Tooltip({
         left = rect.right + 8;
         top = rect.top + rect.height / 2 - tooltipRect.height / 2;
         if (left + tooltipRect.width > viewport.width) {
-          newSide = 'left';
           left = rect.left - tooltipRect.width - 8;
         }
         if (top < 0) top = 8;
@@ -110,7 +105,6 @@ export function Tooltip({
         break;
     }
 
-    setActualSide(newSide);
     setPosition({ top, left, right, bottom });
   };
 
@@ -129,9 +123,9 @@ export function Tooltip({
   }, [isVisible]);
 
   // Mobile support: long press
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout>();
+  const [longPressTimer, setLongPressTimer] = useState<ReturnType<typeof setTimeout>>();
   
-  const handleTouchStart = (e: React.TouchEvent) => {
+  const handleTouchStart = () => {
     const timer = setTimeout(() => {
       showTooltip();
     }, 500); // 500ms for long press
@@ -146,22 +140,36 @@ export function Tooltip({
     hideTooltip();
   };
 
-  const child = React.cloneElement(children, {
-    ref: (node: HTMLElement) => {
-      triggerRef.current = node;
-      if (typeof children.ref === 'function') {
-        children.ref(node);
-      } else if (children.ref) {
-        (children.ref as React.MutableRefObject<HTMLElement | null>).current = node;
-      }
-    },
+  const childProps: any = {
     onMouseEnter: showTooltip,
     onMouseLeave: hideTooltip,
     onFocus: showTooltip,
     onBlur: hideTooltip,
     onTouchStart: handleTouchStart,
     onTouchEnd: handleTouchEnd,
-  });
+  };
+
+  // Handle ref properly
+  const originalRef = (children as any).ref;
+  if (originalRef) {
+    if (typeof originalRef === 'function') {
+      childProps.ref = (node: HTMLElement | null) => {
+        triggerRef.current = node;
+        originalRef(node);
+      };
+    } else if (typeof originalRef === 'object') {
+      childProps.ref = (node: HTMLElement | null) => {
+        triggerRef.current = node;
+        originalRef.current = node;
+      };
+    }
+  } else {
+    childProps.ref = (node: HTMLElement | null) => {
+      triggerRef.current = node;
+    };
+  }
+
+  const child = React.cloneElement(children, childProps);
 
   return (
     <>

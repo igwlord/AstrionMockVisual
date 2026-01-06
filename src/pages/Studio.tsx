@@ -515,7 +515,7 @@ export function Studio() {
                       resolve(null);
                   };
                   bgImg.onerror = reject;
-                  bgImg.src = backgroundState.image;
+                  bgImg.src = backgroundState.image || '';
               });
           }
 
@@ -570,7 +570,7 @@ export function Studio() {
                           resolve(null);
                       };
                       img.onerror = reject;
-                      img.src = layer.src;
+                      img.src = layer.src || '';
                   });
               } else if (layer.type === 'rect' || layer.type === 'circle' || layer.type === 'triangle' || layer.type === 'polygon') {
                   const width = layer.width || 100;

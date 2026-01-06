@@ -1,6 +1,5 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Trash2, Lock, Unlock, Eye, EyeOff } from 'lucide-react';
 import clsx from 'clsx';
 
 interface ContextMenuProps {
