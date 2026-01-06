@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useImageSystem } from '../hooks/useImageSystem';
 import { Plus, Edit2, Loader2 } from 'lucide-react';
+import { EditableText } from '../components/EditableText';
 
 interface Video {
   id: number;
@@ -109,12 +110,14 @@ export function YouTube() {
                </div>
             </div>
             
-            <div className="text-bone/60 text-sm max-w-2xl cursor-pointer hover:text-bone">
-               <p className="line-clamp-1">
-                  Astrion is a DJ and producer specializing in Progressive House, Melodic Techno, and sets... <span className="font-medium text-bone">more</span>
-               </p>
-               <a href="#" className="text-gold/80 hover:text-gold mt-1 block font-medium">astrionmusic.netlify.app</a>
-            </div>
+             <div className="text-bone/60 text-sm max-w-2xl cursor-pointer hover:text-bone">
+                <div className="mb-1">
+                    <EditableText storageKey="yt_description" defaultText="Astrion is a DJ and producer specializing in Progressive House, Melodic Techno, and sets..." multiline />
+                </div>
+                <div className="font-medium">
+                    <EditableText storageKey="yt_link" defaultText="astrionmusic.netlify.app" link className="text-gold/80 hover:text-gold" />
+                </div>
+             </div>
 
             <div className="flex gap-3 pt-1">
                <button className="px-4 py-2 bg-white/10 hover:bg-white/20 text-bone text-sm font-medium rounded-full transition-colors">

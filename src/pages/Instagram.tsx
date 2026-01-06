@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Grid, Heart, MessageCircle, Share2, X, Bookmark, Plus, Edit2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { EditableText } from '../components/EditableText';
 
 import { useImageSystem } from '../hooks/useImageSystem';
 
@@ -126,6 +127,7 @@ export function Instagram() {
          onChange={handleFileChange}
       />
 
+
       {/* ... Header ... */}
       <div className="flex flex-col gap-4 pt-4">
            {/* Profile Header */}
@@ -138,10 +140,9 @@ export function Instagram() {
               
               <div className="space-y-4">
                  <div className="flex items-center gap-4">
-                    <h2 className="text-xl font-medium text-bone">astrion.official</h2>
-                    <button className="px-4 py-1.5 bg-white/5 hover:bg-white/10 rounded text-sm font-medium text-bone transition-colors">
-                       Edit Profile
-                    </button>
+                    <h2 className="text-xl font-medium text-bone">
+                        <EditableText storageKey="ig_username" defaultText="astrion.official" />
+                    </h2>
                  </div>
                  
                  <div className="flex items-center gap-8 text-sm">
@@ -151,8 +152,12 @@ export function Instagram() {
                  </div>
                  
                  <div>
-                    <div className="text-sm font-medium text-bone/90">Organismo sonoro · Frecuencia contenida</div>
-                    <a href="#" className="text-sm text-bone/50 hover:text-gold transition-colors">linktr.ee/astrion</a>
+                    <div className="text-sm font-medium text-bone/90 mb-1">
+                        <EditableText storageKey="ig_bio" defaultText="Organismo sonoro · Frecuencia contenida" multiline />
+                    </div>
+                    <div className="text-sm text-bone/50">
+                        <EditableText storageKey="ig_link" defaultText="linktr.ee/astrion" link className="text-bone/50 hover:text-gold" />
+                    </div>
                  </div>
               </div>
            </div>

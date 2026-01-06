@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef } from 'react';
 import { Play, Heart, MoreHorizontal, MessageCircle, RefreshCw, BarChart2, Radio, Pencil, Share2, Link as LinkIcon, Star, Edit2, Loader2 } from 'lucide-react';
 import { useImageSystem } from '../hooks/useImageSystem';
+import { EditableText } from '../components/EditableText';
 
 interface Track {
   id: number;
@@ -259,12 +260,16 @@ export function SoundCloud() {
              
              {/* Text Info */}
              <div className="mt-8">
-                 <h1 className="text-3xl font-display bg-black/80 px-2 py-1 inline-block text-white mb-2 shadow-lg">Astrion</h1>
+                 <h1 className="text-3xl font-display bg-black/80 px-2 py-1 inline-block text-white mb-2 shadow-lg">
+                    <EditableText storageKey="sc_display_name" defaultText="Astrion" />
+                 </h1>
                  <br/>
-                 <h2 className="text-sm text-white/80 bg-black/60 px-2 py-0.5 inline-block mb-3 font-medium text-bone/80">Guido Di Pietro</h2>
+                 <h2 className="text-sm text-white/80 bg-black/60 px-2 py-0.5 inline-block mb-3 font-medium text-bone/80">
+                    <EditableText storageKey="sc_full_name" defaultText="Guido Di Pietro" />
+                 </h2>
                  <br/>
                  <div className="text-xs text-white/60 mb-2 inline-block bg-black/60 px-2 py-0.5">
-                    Buenos Aires, Argentina
+                    <EditableText storageKey="sc_location" defaultText="Buenos Aires, Argentina" />
                  </div>
                  <div className="flex items-center gap-2 mt-1">
                     <div className="bg-gold text-abyss text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 uppercase tracking-wider">
@@ -353,9 +358,13 @@ export function SoundCloud() {
 
               {/* Bio */}
               <div className="text-sm text-bone/80 space-y-2 leading-relaxed">
-                 <p className="line-clamp-4">
-                    Cada set está pensado para elevar tu vibración. Desde la profundidad, mi música busca abrir armonizar la energía, expandir la conciencia y llevarlos por un viaje inolvidable.
-                 </p>
+                 <div className="line-clamp-4">
+                    <EditableText 
+                        storageKey="sc_bio" 
+                        defaultText="Cada set está pensado para elevar tu vibración. Desde la profundidad, mi música busca abrir armonizar la energía, expandir la conciencia y llevarlos por un viaje inolvidable." 
+                        multiline 
+                    />
+                 </div>
                  <button className="text-bone/60 text-xs font-semibold hover:text-white transition-colors">Show more</button>
               </div>
 
