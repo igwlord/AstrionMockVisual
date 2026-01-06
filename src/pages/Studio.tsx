@@ -168,7 +168,7 @@ export function Studio() {
       }
     }
   }, []);
-  
+
   // Grouped background state
   const [backgroundState, setBackgroundState] = useState({
     image: null as string | null,
@@ -251,6 +251,10 @@ export function Studio() {
         }
         initialized.current = true;
     }
+    // Cleanup: reset on unmount so restoration runs on next mount
+    return () => {
+        initialized.current = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -1239,6 +1243,13 @@ export function Studio() {
   const selectedLayer = selectedLayerId ? (layers.find(l => l.id === selectedLayerId) || null) : null; // Primary
   const multiSelection = selectedLayerIds.length > 1;
 
+  // Auto-switch to properties tab when Image tool is selected and no layer is selected
+  useEffect(() => {
+    if (activeTool === 'image' && selectedLayerIds.length === 0) {
+      setActiveTab('properties');
+    }
+  }, [activeTool, selectedLayerIds.length]);
+
   return (
     <div className="flex flex-col md:flex-row h-screen bg-abyss text-bone font-sans overflow-hidden select-none">
         
@@ -1466,22 +1477,55 @@ export function Studio() {
                                              <span className={clsx("text-xs truncate transition-colors", isSelected ? "text-white font-medium" : TEXT_OPACITY.medium)}>{l.text || l.id}</span>
                                          </div>
                                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); updateLayer(l.id, { locked: !l.locked }); }} 
-                                                className={clsx("p-1 hover:text-white focus:outline-none focus:ring-2 focus:ring-gold/50 rounded", l.locked ? "text-gold opacity-100" : "text-bone/20")}
-                                                aria-label={l.locked ? "Desbloquear capa" : "Bloquear capa"}
-                                                aria-pressed={l.locked}
-                                            >
-                                                <Lock className="w-3 h-3"/>
-                                            </button>
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); updateLayer(l.id, { visible: !l.visible }); }} 
-                                                className={clsx("p-1 hover:text-white focus:outline-none focus:ring-2 focus:ring-gold/50 rounded", !l.visible ? "text-bone/20 opacity-100" : "text-bone/50")}
-                                                aria-label={l.visible ? "Ocultar capa" : "Mostrar capa"}
-                                                aria-pressed={l.visible}
-                                            >
-                                                <Eye className="w-3 h-3"/>
-                                            </button>
+                                            <div className="group/btn relative">
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); updateLayer(l.id, { locked: !l.locked }); }} 
+                                                    className={clsx("p-1 hover:text-white focus:outline-none focus:ring-2 focus:ring-gold/50 rounded", l.locked ? "text-gold opacity-100" : "text-bone/20")}
+                                                    aria-label={l.locked ? "Desbloquear capa" : "Bloquear capa"}
+                                                    aria-pressed={l.locked}
+                                                    title={l.locked ? "Desbloquear capa" : "Bloquear capa"}
+                                                >
+                                                    {l.locked ? <Lock className="w-3 h-3"/> : <Unlock className="w-3 h-3"/>}
+                                                </button>
+                                                <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/btn:opacity-100 z-50 hidden md:block bg-abyss border border-white/10 rounded px-2 py-1 shadow-xl whitespace-nowrap pointer-events-none">
+                                                    <div className="text-[10px] font-bold text-white uppercase">{l.locked ? "Desbloquear" : "Bloquear"}</div>
+                                                    <div className="text-[9px] text-bone/60">{l.locked ? "Permite editar esta capa" : "Impide editar esta capa"}</div>
+                                                </div>
+                                            </div>
+                                            <div className="group/btn relative">
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); updateLayer(l.id, { visible: !l.visible }); }} 
+                                                    className={clsx("p-1 hover:text-white focus:outline-none focus:ring-2 focus:ring-gold/50 rounded", !l.visible ? "text-bone/20 opacity-100" : "text-bone/50")}
+                                                    aria-label={l.visible ? "Ocultar capa" : "Mostrar capa"}
+                                                    aria-pressed={l.visible}
+                                                    title={l.visible ? "Ocultar capa" : "Mostrar capa"}
+                                                >
+                                                    {l.visible ? <Eye className="w-3 h-3"/> : <EyeOff className="w-3 h-3"/>}
+                                                </button>
+                                                <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/btn:opacity-100 z-50 hidden md:block bg-abyss border border-white/10 rounded px-2 py-1 shadow-xl whitespace-nowrap pointer-events-none">
+                                                    <div className="text-[10px] font-bold text-white uppercase">{l.visible ? "Ocultar" : "Mostrar"}</div>
+                                                    <div className="text-[9px] text-bone/60">{l.visible ? "Oculta esta capa en el canvas" : "Muestra esta capa en el canvas"}</div>
+                                                </div>
+                                            </div>
+                                            <div className="group/btn relative">
+                                                <button 
+                                                    onClick={(e) => { 
+                                                        e.stopPropagation(); 
+                                                        updateLayers(prev => prev.filter(layer => layer.id !== l.id));
+                                                        setSelectedLayerIds(prev => prev.filter(id => id !== l.id));
+                                                        showNotification('Capa eliminada', 'success');
+                                                    }} 
+                                                    className="p-1 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 rounded text-bone/20"
+                                                    aria-label="Eliminar capa"
+                                                    title="Eliminar capa"
+                                                >
+                                                    <Trash2 className="w-3 h-3"/>
+                                                </button>
+                                                <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/btn:opacity-100 z-50 hidden md:block bg-abyss border border-white/10 rounded px-2 py-1 shadow-xl whitespace-nowrap pointer-events-none">
+                                                    <div className="text-[10px] font-bold text-red-400 uppercase">Eliminar</div>
+                                                    <div className="text-[9px] text-bone/60">Elimina esta capa permanentemente</div>
+                                                </div>
+                                            </div>
                                          </div>
                                      </div>
                                  );
@@ -1561,11 +1605,11 @@ export function Studio() {
                                   
                                   {/* BRUSH & ERASER CONTROLS */}
                                   <div className="space-y-4">
-                                      <RangeControl label="Tamaño" value={brushState.size} min={1} max={100} onChange={(v: number) => setBrushState(prev => ({ ...prev, size: v }))} />
+                                      <RangeControl label="Tamaño" value={brushState.size} min={1} max={100} onChange={(v: number) => setBrushState(prev => ({ ...prev, size: v }))} tooltip="Controla el grosor del trazo del pincel o borrador" />
                                       {(activeTool === 'brush' || activeTool === 'eraser') && (
                                           <>
-                                              <RangeControl label="Dureza" value={100 - (brushState.blur * 5)} min={0} max={100} onChange={(v: number) => setBrushState(prev => ({ ...prev, blur: (100 - v)/5 }))} />
-                                              <RangeControl label="Opacidad" value={brushState.opacity} min={1} max={100} onChange={(v: number) => setBrushState(prev => ({ ...prev, opacity: v }))} />
+                                              <RangeControl label="Dureza" value={100 - (brushState.blur * 5)} min={0} max={100} onChange={(v: number) => setBrushState(prev => ({ ...prev, blur: (100 - v)/5 }))} tooltip="Controla qué tan suave o duro es el borde del trazo. Mayor dureza = bordes más definidos" />
+                                              <RangeControl label="Opacidad" value={brushState.opacity} min={1} max={100} onChange={(v: number) => setBrushState(prev => ({ ...prev, opacity: v }))} tooltip="Controla la transparencia del trazo. 100% = completamente opaco" />
                                           </>
                                       )}
                                       <div className="p-3 bg-white/5 rounded text-[10px] text-bone/50">
@@ -1715,8 +1759,8 @@ export function Studio() {
                                      </select>
                                  </div>
 
-                                 <RangeControl label="Tamaño" value={selectedLayer.fontSize||10} min={10} max={400} onChange={(v: number) => updateLayer(selectedLayer.id, {fontSize:v})} />
-                                 <RangeControl label="Espaciado" value={selectedLayer.letterSpacing||0} min={-100} max={100} onChange={(v: number) => updateLayer(selectedLayer.id, {letterSpacing:v})} />
+                                 <RangeControl label="Tamaño" value={selectedLayer.fontSize||10} min={10} max={400} onChange={(v: number) => updateLayer(selectedLayer.id, {fontSize:v})} tooltip="Tamaño de la fuente del texto en píxeles" />
+                                 <RangeControl label="Espaciado" value={selectedLayer.letterSpacing||0} min={-100} max={100} onChange={(v: number) => updateLayer(selectedLayer.id, {letterSpacing:v})} tooltip="Espaciado entre letras. Valores negativos acercan las letras, positivos las separan" />
                                  
                                  {/* Rotación y Orientación */}
                                  <div className="space-y-3">
@@ -1813,7 +1857,7 @@ export function Studio() {
                                  
                                  <div className="flex items-center gap-2">
                                      <div className="flex-1">
-                                         <RangeControl label="Curva" value={(selectedLayer as any).curve||0} min={-180} max={180} onChange={(v: number) => updateLayer(selectedLayer.id, {curve:v})} />
+                                         <RangeControl label="Curva" value={(selectedLayer as any).curve||0} min={-180} max={180} onChange={(v: number) => updateLayer(selectedLayer.id, {curve:v})} tooltip="Curvatura del texto. 0 = recto, valores negativos curvan hacia arriba, positivos hacia abajo" />
                                      </div>
                                      <button 
                                          onClick={() => updateLayer(selectedLayer.id, {curve: 0})} 
@@ -1823,8 +1867,8 @@ export function Studio() {
                                          Reset
                                      </button>
                                  </div>
-                                 <RangeControl label="Sombra" value={(selectedLayer as any).shadowBlur||0} min={0} max={50} onChange={(v: number) => updateLayer(selectedLayer.id, {shadowBlur:v})} />
-                                 <RangeControl label="Brillo" value={selectedLayer.glowIntensity||0} min={0} max={100} onChange={(v: number) => updateLayer(selectedLayer.id, {glowIntensity:v})} />
+                                 <RangeControl label="Sombra" value={(selectedLayer as any).shadowBlur||0} min={0} max={50} onChange={(v: number) => updateLayer(selectedLayer.id, {shadowBlur:v})} tooltip="Intensidad del desenfoque de la sombra del texto" />
+                                 <RangeControl label="Brillo" value={selectedLayer.glowIntensity||0} min={0} max={100} onChange={(v: number) => updateLayer(selectedLayer.id, {glowIntensity:v})} tooltip="Intensidad del efecto de brillo o resplandor alrededor del texto" />
 
                                  <div className="grid grid-cols-2 gap-2">
                                      <button onClick={() => updateLayer(selectedLayer.id, { fontWeight: selectedLayer.fontWeight==='bold'?'normal':'bold' })} className={clsx("p-2 rounded border", selectedLayer.fontWeight==='bold' ? "border-gold text-gold" : "border-white/10 text-bone/50")}><Bold className="w-4 h-4 mx-auto"/></button>
@@ -1838,15 +1882,38 @@ export function Studio() {
                              <div className="space-y-4">
                                  <div className="flex justify-between items-center text-[10px] text-bone/50 font-bold uppercase">Filtros <button onClick={()=>updateLayer(selectedLayer.id, {filters:{brightness:100,contrast:100,saturation:100,blur:0,preset:''}})} className="text-gold hover:text-white">Restablecer</button></div>
                                  <div className="flex flex-wrap gap-2">
-                                     {FILTER_PRESETS.map(f => (
-                                         <button key={f.label} onClick={() => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters!, preset: f.value } })} className={clsx("px-2 py-1 text-[10px] border rounded", selectedLayer.filters?.preset === f.value ? "border-gold text-gold" : "border-white/10 text-bone/40")}>{f.label}</button>
-                                     ))}
+                                     {FILTER_PRESETS.map(f => {
+                                         const descriptions: Record<string, string> = {
+                                             'Normal': 'Sin filtro aplicado',
+                                             'Blanco y Negro': 'Convierte la imagen a escala de grises',
+                                             'Vintage Suave': 'Efecto vintage suave con tonos sepia y contraste reducido',
+                                             'Dramático': 'Aumenta el contraste y saturación para un look más intenso',
+                                             'Cálido': 'Añade tonos cálidos y aumenta la saturación',
+                                             'Frío': 'Aplica un tono frío con rotación de matiz',
+                                             'Alto Contraste': 'Máximo contraste para imágenes impactantes'
+                                         };
+                                         return (
+                                             <div key={f.label} className="group/filter relative">
+                                                 <button 
+                                                     onClick={() => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters!, preset: f.value } })} 
+                                                     className={clsx("px-2 py-1 text-[10px] border rounded transition-colors", selectedLayer.filters?.preset === f.value ? "border-gold text-gold" : "border-white/10 text-bone/40 hover:border-white/20")}
+                                                     title={descriptions[f.label] || f.label}
+                                                 >
+                                                     {f.label}
+                                                 </button>
+                                                 <div className="absolute left-0 top-full mt-2 opacity-0 group-hover/filter:opacity-100 z-50 hidden md:block bg-abyss border border-white/10 rounded px-2 py-1 shadow-xl whitespace-nowrap pointer-events-none">
+                                                     <div className="text-[10px] font-bold text-white uppercase">{f.label}</div>
+                                                     <div className="text-[9px] text-bone/60">{descriptions[f.label] || 'Aplica este filtro a la imagen'}</div>
+                                                 </div>
+                                             </div>
+                                         );
+                                     })}
                                  </div>
                                  <div className="h-px bg-white/5 my-2"/>
-                                 <RangeControl label="Brillo" value={selectedLayer.filters?.brightness ?? 100} min={0} max={200} onChange={(v: number) => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters!, brightness: v } })} />
-                                 <RangeControl label="Contraste" value={selectedLayer.filters?.contrast ?? 100} min={0} max={200} onChange={(v: number) => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters!, contrast: v } })} />
-                                 <RangeControl label="Saturación" value={selectedLayer.filters?.saturation ?? 100} min={0} max={200} onChange={(v: number) => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters!, saturation: v } })} />
-                                 <RangeControl label="Desenfoque" value={selectedLayer.filters?.blur ?? 0} min={0} max={20} onChange={(v: number) => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters!, blur: v } })} />
+                                 <RangeControl label="Brillo" value={selectedLayer.filters?.brightness ?? 100} min={0} max={200} onChange={(v: number) => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters!, brightness: v } })} tooltip="Ajusta el brillo de la imagen. 100% = normal, mayor = más brillo, menor = más oscuro" />
+                                 <RangeControl label="Contraste" value={selectedLayer.filters?.contrast ?? 100} min={0} max={200} onChange={(v: number) => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters!, contrast: v } })} tooltip="Ajusta la diferencia entre luces y sombras. Mayor = más contraste, menor = menos contraste" />
+                                 <RangeControl label="Saturación" value={selectedLayer.filters?.saturation ?? 100} min={0} max={200} onChange={(v: number) => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters!, saturation: v } })} tooltip="Controla la intensidad de los colores. 100% = normal, 0% = escala de grises, mayor = más color" />
+                                 <RangeControl label="Desenfoque" value={selectedLayer.filters?.blur ?? 0} min={0} max={20} onChange={(v: number) => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters!, blur: v } })} tooltip="Aplica un efecto de desenfoque a la imagen. Mayor valor = más desenfoque" />
                              </div>
                         )}
 
@@ -2200,7 +2267,7 @@ export function Studio() {
                                                  {backgroundState.locked ? <><Lock className="w-3 h-3"/> Bloqueado</> : <><Unlock className="w-3 h-3"/> Desbloqueado</>}
                                              </button>
                                          </div>
-                                         <RangeControl label="Escala" value={backgroundState.scale} min={0.1} max={3} onChange={(v: number) => setBackgroundState(prev => ({ ...prev, scale: v }))} />
+                                         <RangeControl label="Escala" value={backgroundState.scale} min={0.1} max={3} onChange={(v: number) => setBackgroundState(prev => ({ ...prev, scale: v }))} tooltip="Tamaño de la imagen de fondo. 1.0 = tamaño original, mayor = más grande, menor = más pequeño" />
                                      </div>
                                  )}
 
@@ -2221,19 +2288,36 @@ export function Studio() {
                                              </button>
                                          </div>
                                          <div className="grid grid-cols-2 gap-2">
-                                             {FILTER_PRESETS.map(f => (
-                                                 <button 
-                                                     key={f.label} 
-                                                     onClick={() => {
-                                                         setBackgroundState(prev => ({ ...prev, filters: { ...prev.filters, preset: f.value } }));
-                                                         setFilterIntensity(100); // Reset intensity when changing preset
-                                                     }} 
-                                                     className={clsx("px-2 py-1.5 text-[10px] border rounded focus:outline-none focus:ring-2 focus:ring-gold/50 transition-colors", backgroundState.filters.preset === f.value ? "border-gold text-gold bg-gold/10" : "border-white/10 text-bone/40 hover:bg-white/5")} 
-                                                     aria-label={`Aplicar filtro ${f.label}`}
-                                                 >
-                                                     {f.label}
-                                                 </button>
-                                             ))}
+                                             {FILTER_PRESETS.map(f => {
+                                                 const descriptions: Record<string, string> = {
+                                                     'Normal': 'Sin filtro aplicado',
+                                                     'Blanco y Negro': 'Convierte la imagen a escala de grises',
+                                                     'Vintage Suave': 'Efecto vintage suave con tonos sepia y contraste reducido',
+                                                     'Dramático': 'Aumenta el contraste y saturación para un look más intenso',
+                                                     'Cálido': 'Añade tonos cálidos y aumenta la saturación',
+                                                     'Frío': 'Aplica un tono frío con rotación de matiz',
+                                                     'Alto Contraste': 'Máximo contraste para imágenes impactantes'
+                                                 };
+                                                 return (
+                                                     <div key={f.label} className="group/filter relative">
+                                                         <button 
+                                                             onClick={() => {
+                                                                 setBackgroundState(prev => ({ ...prev, filters: { ...prev.filters, preset: f.value } }));
+                                                                 setFilterIntensity(100); // Reset intensity when changing preset
+                                                             }} 
+                                                             className={clsx("px-2 py-1.5 text-[10px] border rounded focus:outline-none focus:ring-2 focus:ring-gold/50 transition-colors", backgroundState.filters.preset === f.value ? "border-gold text-gold bg-gold/10" : "border-white/10 text-bone/40 hover:bg-white/5")} 
+                                                             aria-label={`Aplicar filtro ${f.label}`}
+                                                             title={descriptions[f.label] || f.label}
+                                                         >
+                                                             {f.label}
+                                                         </button>
+                                                         <div className="absolute left-0 top-full mt-2 opacity-0 group-hover/filter:opacity-100 z-50 hidden md:block bg-abyss border border-white/10 rounded px-2 py-1 shadow-xl whitespace-nowrap pointer-events-none">
+                                                             <div className="text-[10px] font-bold text-white uppercase">{f.label}</div>
+                                                             <div className="text-[9px] text-bone/60">{descriptions[f.label] || 'Aplica este filtro a la imagen de fondo'}</div>
+                                                         </div>
+                                                     </div>
+                                                 );
+                                             })}
                                          </div>
                                          {backgroundState.filters.preset && (
                                              <div className="space-y-2 pt-2 border-t border-white/5">
@@ -2254,10 +2338,10 @@ export function Studio() {
                                      <div className="space-y-4">
                                          <div className="text-[10px] text-bone/50 font-bold uppercase">Ajustes de imagen</div>
                                          <div className="space-y-3">
-                                             <RangeControl label="Brillo" value={backgroundState.filters.brightness} min={0} max={200} onChange={(v: number) => setBackgroundState(prev => ({ ...prev, filters: { ...prev.filters, brightness: v } }))} />
-                                             <RangeControl label="Contraste" value={backgroundState.filters.contrast} min={0} max={200} onChange={(v: number) => setBackgroundState(prev => ({ ...prev, filters: { ...prev.filters, contrast: v } }))} />
-                                             <RangeControl label="Saturación" value={backgroundState.filters.saturation} min={0} max={200} onChange={(v: number) => setBackgroundState(prev => ({ ...prev, filters: { ...prev.filters, saturation: v } }))} />
-                                             <RangeControl label="Desenfoque" value={backgroundState.filters.blur} min={0} max={20} onChange={(v: number) => setBackgroundState(prev => ({ ...prev, filters: { ...prev.filters, blur: v } }))} />
+                                             <RangeControl label="Brillo" value={backgroundState.filters.brightness} min={0} max={200} onChange={(v: number) => setBackgroundState(prev => ({ ...prev, filters: { ...prev.filters, brightness: v } }))} tooltip="Ajusta el brillo de la imagen de fondo. 100% = normal, mayor = más brillo, menor = más oscuro" />
+                                             <RangeControl label="Contraste" value={backgroundState.filters.contrast} min={0} max={200} onChange={(v: number) => setBackgroundState(prev => ({ ...prev, filters: { ...prev.filters, contrast: v } }))} tooltip="Ajusta la diferencia entre luces y sombras del fondo. Mayor = más contraste, menor = menos contraste" />
+                                             <RangeControl label="Saturación" value={backgroundState.filters.saturation} min={0} max={200} onChange={(v: number) => setBackgroundState(prev => ({ ...prev, filters: { ...prev.filters, saturation: v } }))} tooltip="Controla la intensidad de los colores del fondo. 100% = normal, 0% = escala de grises, mayor = más color" />
+                                             <RangeControl label="Desenfoque" value={backgroundState.filters.blur} min={0} max={20} onChange={(v: number) => setBackgroundState(prev => ({ ...prev, filters: { ...prev.filters, blur: v } }))} tooltip="Aplica un efecto de desenfoque a la imagen de fondo. Mayor valor = más desenfoque" />
                                          </div>
                                      </div>
                                  )}
@@ -2773,6 +2857,30 @@ const TooltipButton = React.memo(({ icon: Icon, label, tooltip, active, onClick,
     );
 });
 
-const RangeControl = React.memo(({ label, value, min, max, onChange }: {label: string, value: number, min: number, max: number, onChange: (v: number) => void}) => {
-    return (<div><div className="flex justify-between mb-1"><label className="text-[10px] uppercase text-bone/50 font-bold">{label}</label><span className="text-[10px] font-mono text-bone/50">{Math.round(value*10)/10}</span></div><input type="range" step="0.1" min={min} max={max} value={value} onChange={e => onChange(Number(e.target.value))} className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-gold"/></div>);
+const RangeControl = React.memo(({ label, value, min, max, onChange, tooltip }: {label: string, value: number, min: number, max: number, onChange: (v: number) => void, tooltip?: string}) => {
+    return (
+        <div className="group/range relative">
+            <div className="flex justify-between mb-1">
+                <label className="text-[10px] uppercase text-bone/50 font-bold">{label}</label>
+                <span className="text-[10px] font-mono text-bone/50">{Math.round(value*10)/10}</span>
+            </div>
+            <input 
+                type="range" 
+                step="0.1" 
+                min={min} 
+                max={max} 
+                value={value} 
+                onChange={e => onChange(Number(e.target.value))} 
+                className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-gold"
+                aria-label={tooltip || label}
+                title={tooltip || label}
+            />
+            {tooltip && (
+                <div className="absolute left-0 top-full mt-2 opacity-0 group-hover/range:opacity-100 z-50 hidden md:block bg-abyss border border-white/10 rounded px-2 py-1 shadow-xl whitespace-nowrap pointer-events-none">
+                    <div className="text-[10px] font-bold text-white uppercase">{label}</div>
+                    <div className="text-[9px] text-bone/60">{tooltip}</div>
+                </div>
+            )}
+        </div>
+    );
 });
