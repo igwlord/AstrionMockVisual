@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Grid, Heart, MessageCircle, Share2, X, Bookmark, Plus, Edit2, Loader2 } from 'lucide-react';
+import { Grid, Heart, MessageCircle, Share2, X, Bookmark, Plus, Edit2, Loader2, Trash } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EditableText } from '../components/EditableText';
 
@@ -15,6 +15,7 @@ interface Post {
   caption: string;
   imageUrl?: string;
   isPlaceholder?: boolean; // Flag to know if it's a real upload or a filler
+  fileName?: string; // Add filename to reference for deletion
 }
 
 // Generate 12 placeholder posts
@@ -68,10 +69,10 @@ function PostVisual({ type, index }: { type: PostType, index: number }) {
 
 export function Instagram() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const { images, loading, uploadImage } = useImageSystem('instagram');
-  const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
+  const { images, loading, uploadImage, deleteImage } = useImageSystem('instagram');
+  const [uploadingSlot, setUploadingSlot] = useState<number | string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const activeSlotRef = useRef<number | null>(null);
+  const activeSlotRef = useRef<number | string | null>(null);
 
   // Mapped Grid: Combine Placeholders with Real Uploads
   // We expect files named "instagram_post_0", "instagram_post_1", etc.
@@ -84,16 +85,24 @@ export function Instagram() {
               ...placeholder,
               imageUrl: existingImage.url,
               isPlaceholder: false,
-              caption: `Uploaded Content // Slot ${idx}`
+              caption: `Uploaded Content // Slot ${idx}`,
+              fileName: existingImage.name
           };
       }
       return placeholder;
   });
 
-  const handleUploadClick = (e: React.MouseEvent, slotIndex: number) => {
+  const handleUploadClick = (e: React.MouseEvent, slotIndex: number | string) => {
       e.stopPropagation(); // Prevent opening modal
       activeSlotRef.current = slotIndex;
       fileInputRef.current?.click();
+  };
+
+  const handleDeleteClick = async (e: React.MouseEvent, fileName: string) => {
+      e.stopPropagation();
+      if (window.confirm("Are you sure you want to delete this image?")) {
+          await deleteImage(fileName);
+      }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,8 +111,8 @@ export function Instagram() {
           setUploadingSlot(slot);
           try {
               const file = e.target.files[0];
-              // Upload with specific name to lock it to this grid slot
-              await uploadImage(file, `instagram_post_${slot}`);
+              // Determine filename based on slot type and upload
+              await uploadImage(file, typeof slot === 'number' ? `instagram_post_${slot}` : `instagram_${slot}`);
           } catch (error) {
               console.error("Grid upload failed", error);
               alert("Error uploading to grid.");
@@ -164,47 +173,36 @@ export function Instagram() {
 
            {/* Highlighted Stories (Historias Destacadas) */}
            <div className="flex gap-6 md:gap-8 px-4 md:pl-8 py-6 overflow-x-auto no-scrollbar">
-              
-              {/* EON: Origen */}
-              <div className="flex flex-col items-center gap-2 group cursor-pointer">
-                 <div className="w-16 h-16 rounded-full border border-white/5 bg-abyss flex items-center justify-center relative overflow-hidden group-hover:border-gold/30 transition-colors p-0.5">
-                    <img src="/images/historia (1).png" alt="EON" className="w-full h-full rounded-full object-cover" />
-                 </div>
-                 <span className="text-[10px] font-mono tracking-widest text-bone/50 uppercase group-hover:text-bone/80 transition-colors">EON</span>
-              </div>
+               {[
+                   { id: 'EON', img: '/images/historia (1).png' },
+                   { id: 'TRNS', img: '/images/historia (2).png' },
+                   { id: 'HZ', img: '/images/historia (3).png' },
+                   { id: 'LOG', img: '/images/historia (4).png' },
+                   { id: 'TRVL', img: '/images/historia (5).png' },
+               ].map((highlight) => {
+                   // Check for uploaded override
+                   const override = images.find(img => img.name === `instagram_highlight_${highlight.id}`);
+                   const displayImage = override ? override.url : highlight.img;
+                   const isUploading = uploadingSlot === `highlight_${highlight.id}`; // Type assertion for shared state
 
-              {/* TRNS: Transmisión */}
-              <div className="flex flex-col items-center gap-2 group cursor-pointer">
-                 <div className="w-16 h-16 rounded-full border border-white/5 bg-abyss flex items-center justify-center relative overflow-hidden group-hover:border-bone/30 transition-colors p-0.5">
-                    <img src="/images/historia (2).png" alt="TRNS" className="w-full h-full rounded-full object-cover" />
-                 </div>
-                 <span className="text-[10px] font-mono tracking-widest text-bone/50 uppercase group-hover:text-bone/80 transition-colors">TRNS</span>
-              </div>
-
-              {/* HZ: Frecuencia */}
-              <div className="flex flex-col items-center gap-2 group cursor-pointer">
-                 <div className="w-16 h-16 rounded-full border border-white/5 bg-abyss flex items-center justify-center relative overflow-hidden group-hover:border-nebula/30 transition-colors p-0.5">
-                     <img src="/images/historia (3).png" alt="HZ" className="w-full h-full rounded-full object-cover" />
-                 </div>
-                 <span className="text-[10px] font-mono tracking-widest text-bone/50 uppercase group-hover:text-bone/80 transition-colors">HZ</span>
-              </div>
-
-              {/* LOG: Registro */}
-              <div className="flex flex-col items-center gap-2 group cursor-pointer">
-                 <div className="w-16 h-16 rounded-full border border-white/5 bg-abyss flex items-center justify-center relative overflow-hidden group-hover:border-white/30 transition-colors p-0.5">
-                     <img src="/images/historia (4).png" alt="LOG" className="w-full h-full rounded-full object-cover" />
-                 </div>
-                 <span className="text-[10px] font-mono tracking-widest text-bone/50 uppercase group-hover:text-bone/80 transition-colors">LOG</span>
-              </div>
-
-              {/* TRVL: Deriva */}
-              <div className="flex flex-col items-center gap-2 group cursor-pointer">
-                 <div className="w-16 h-16 rounded-full border border-white/5 bg-abyss flex items-center justify-center relative overflow-hidden group-hover:border-white/20 transition-colors p-0.5">
-                     <img src="/images/historia (5).png" alt="TRVL" className="w-full h-full rounded-full object-cover" />
-                 </div>
-                 <span className="text-[10px] font-mono tracking-widest text-bone/50 uppercase group-hover:text-bone/80 transition-colors">TRVL</span>
-              </div>
-
+                   return (
+                       <div key={highlight.id} className="flex flex-col items-center gap-2 group cursor-pointer" onClick={(e) => {
+                           e.stopPropagation();
+                           activeSlotRef.current = `highlight_${highlight.id}`;
+                           fileInputRef.current?.click();
+                       }}>
+                         <div className="w-16 h-16 rounded-full border border-white/5 bg-abyss flex items-center justify-center relative overflow-hidden group-hover:border-gold/30 transition-colors p-0.5">
+                            <img src={displayImage} alt={highlight.id} className="w-full h-full rounded-full object-cover" />
+                            
+                            {/* Edit Overlay */}
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                {isUploading ? <Loader2 className="w-4 h-4 animate-spin text-gold" /> : <Edit2 className="w-4 h-4 text-white" />}
+                            </div>
+                         </div>
+                         <span className="text-[10px] font-mono tracking-widest text-bone/50 uppercase group-hover:text-bone/80 transition-colors">{highlight.id}</span>
+                       </div>
+                   );
+               })}
            </div>
         </div>
 
@@ -242,8 +240,8 @@ export function Instagram() {
                  <PostVisual type={post.type} index={idx} />
              )}
 
-             {/* Interact Overlay (Edit/Upload) */}
-             <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+             {/* Interact Overlay (Edit/Upload/Delete) */}
+             <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-2">
                 <button 
                   onClick={(e) => handleUploadClick(e, idx)} 
                   className="p-2 bg-black/50 hover:bg-gold text-white rounded-full backdrop-blur-md transition-colors shadow-lg"
@@ -257,6 +255,17 @@ export function Instagram() {
                       <Edit2 className="w-4 h-4" />
                    )}
                 </button>
+                
+                {/* Delete Button (Only for uploaded images) */}
+                {!post.isPlaceholder && post.fileName && (
+                    <button 
+                      onClick={(e) => handleDeleteClick(e, post.fileName!)}
+                      className="p-2 bg-black/50 hover:bg-red-500 text-white rounded-full backdrop-blur-md transition-colors shadow-lg"
+                      title="Remove Image"
+                    >
+                       <Trash className="w-4 h-4" />
+                    </button>
+                )}
              </div>
              
              {/* Hover info overlay */}

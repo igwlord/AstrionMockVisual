@@ -177,13 +177,15 @@ export function Tooltip({
             className={`fixed z-[200] pointer-events-none ${className}`}
             style={position}
           >
-            <div className="bg-abyss-panel border border-white/10 rounded-lg px-2 py-1.5 shadow-2xl backdrop-blur-xl">
+            <div className="bg-abyss-panel border border-white/20 rounded-lg px-3 py-2 shadow-2xl backdrop-blur-xl ring-1 ring-white/5">
               {typeof content === 'string' ? (
-                <div className="text-[10px] font-bold text-white uppercase whitespace-nowrap">
+                <div className="text-[10px] font-bold text-white uppercase whitespace-nowrap leading-tight">
                   {content}
                 </div>
               ) : (
-                content
+                <div className="text-[10px] text-white">
+                  {content}
+                </div>
               )}
             </div>
           </motion.div>

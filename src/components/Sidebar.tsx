@@ -7,7 +7,7 @@ import {
   Music, 
   Download,
   Disc,
-  Database
+  Layout
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
@@ -18,8 +18,8 @@ const navItems = [
   { path: '/instagram', label: 'Instagram', icon: Instagram },
   { path: '/youtube', label: 'YouTube', icon: Youtube },
   { path: '/soundcloud', label: 'SoundCloud', icon: Music },
-  { path: '/exports', label: 'Exports', icon: Download },
-  { path: '/upload-matrix', label: 'Upload Matrix', icon: Database },
+  { path: '/studio', label: 'Studio', icon: Layout },
+  { path: '/exports', label: 'Banco de Imagenes', icon: Download },
 ];
 
 export function Sidebar() {

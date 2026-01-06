@@ -27,7 +27,7 @@ export function BrandManifesto({ isOpen, onClose }: BrandManifestoProps) {
           <div className="flex items-center justify-between p-6 border-b border-white/5 bg-abyss-panel sticky top-0 z-10">
             <div>
                <span className="text-xs font-mono text-gold/80 uppercase tracking-widest block mb-1">Guía Visual & Estratégica</span>
-               <h2 className="text-xl font-display text-bone">Protocolo Astrion v1.0</h2>
+               <h2 className="text-xl font-display text-bone">Protocolo Astrion v1.1.0</h2>
             </div>
             <button 
               onClick={onClose}
@@ -207,6 +207,55 @@ export function BrandManifesto({ isOpen, onClose }: BrandManifestoProps) {
                          <div className="text-[9px] text-bone/50 leading-tight">{item.desc}</div>
                       </div>
                    ))}
+                </div>
+             </section>
+
+             {/* 06. PROTOCOLO DE COMUNICACIÓN */}
+             <section className="space-y-8">
+                <div className="flex items-center gap-3">
+                   <div className="w-8 h-8 rounded bg-white/5 flex items-center justify-center border border-white/10 text-gold">
+                      <span className="font-mono font-bold">06</span>
+                   </div>
+                   <h3 className="text-2xl font-display text-bone">Protocolo de Comunicación</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                   {/* Tono de Voz */}
+                   <div className="space-y-4">
+                       <h4 className="text-lg font-medium text-bone border-b border-white/10 pb-2">Reglas de Tono de Voz</h4>
+                       <div className="space-y-4 text-sm text-bone/70">
+                           <p><strong className="text-white">Tono:</strong> Calmado, preciso, selectivo.</p>
+                           <ul className="list-disc pl-4 space-y-1">
+                               <li>Sin emojis.</li>
+                               <li>Sin hype.</li>
+                           </ul>
+                           <div className="bg-white/5 p-3 rounded border-l-2 border-gold/50 italic text-bone/90 mt-2 space-y-2">
+                              <p>"Frequency Session 21. Un nuevo pulso."</p>
+                              <p>"No es música. Es resonancia."</p>
+                              <p>"Deep frequencies. Controlled energy."</p>
+                           </div>
+                       </div>
+                   </div>
+
+                    {/* Statement */}
+                    <div className="space-y-4">
+                       <h4 className="text-lg font-medium text-bone border-b border-white/10 pb-2">Statement</h4>
+                       <p className="text-sm text-bone/70 leading-relaxed">
+                          Astrion es un DJ y live performer especializado en Progressive y Melodic Techno. Su propuesta es un organismo sonoro vivo, diseñado para transportar a la audiencia a través de frecuencias profundas y texturas orgánicas. Lejos del hype comercial, Astrion cultiva el silencio y la precisión.
+                       </p>
+                    </div>
+
+                    {/* Rider Técnico */}
+                    <div className="space-y-4 md:col-span-2">
+                       <h4 className="text-lg font-medium text-bone border-b border-white/10 pb-2">Resumen de Rider Técnico</h4>
+                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-bone/70 font-mono">
+                           <div className="bg-abyss-panel p-2 rounded border border-white/5">1x Allen & Heath Xone:96</div>
+                           <div className="bg-abyss-panel p-2 rounded border border-white/5">2x Pioneer CDJ-3000 (Linked)</div>
+                           <div className="bg-abyss-panel p-2 rounded border border-white/5">1x Eventide H9 Max</div>
+                           <div className="bg-abyss-panel p-2 rounded border border-white/5">1x Roland TR-8S</div>
+                           <div className="bg-abyss-panel p-2 rounded border border-white/5 col-span-full sm:col-span-2">2x Booth Monitors (High Quality)</div>
+                       </div>
+                    </div>
                 </div>
              </section>
 

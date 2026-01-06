@@ -1,30 +1,12 @@
-import { useMemo, useState, useRef } from 'react';
-import { Play, Heart, MoreHorizontal, MessageCircle, RefreshCw, BarChart2, Radio, Pencil, Share2, Link as LinkIcon, Star, Edit2, Loader2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Play, Heart, MoreHorizontal, RefreshCw, BarChart2, Radio, Pencil, Share2, Link as LinkIcon, Star, Trash, Plus } from 'lucide-react';
 import { useImageSystem } from '../hooks/useImageSystem';
 import { EditableText } from '../components/EditableText';
+import { SoundCloudMockModal } from '../components/SoundCloudMockModal';
+import type { SoundCloudMockData } from '../components/SoundCloudMockModal';
 
-interface Track {
-  id: number;
-  title: string;
-  artist: string;
-  genre: string;
-  timeAgo: string;
-  duration: string;
-  plays: string;
-  likes: string;
-  reposts: string;
-  comments: string;
-  coverImage: string;
-  isPlaceholder?: boolean;
-}
-
+// Initial Data for fresh load
 import { TRACKS_DATA } from '../data/mockData';
-
-const placeholderTracks: Track[] = TRACKS_DATA.map(t => ({
-    ...t, 
-    coverImage: t.defaultCover || '', // Map defaultCover to coverImage for UI
-    isPlaceholder: true
-}));
 
 function Waveform() {
   // eslint-disable-next-line
@@ -44,34 +26,43 @@ function Waveform() {
 }
 
 interface TrackItemProps {
-    track: Track;
+    track: SoundCloudMockData;
     index: number;
-    onEdit: (index: number) => void;
-    isUploading: boolean;
+    onClick: (track: SoundCloudMockData) => void;
+    onDelete: (id: string, fileName?: string) => void;
 }
 
-function TrackItem({ track, index, onEdit, isUploading }: TrackItemProps) {
+function TrackItem({ track, onClick, onDelete }: TrackItemProps) {
   return (
-    <div className="flex gap-4 p-4 hover:bg-white/5 rounded-lg transition-colors group relative">
+    <div 
+       className="flex gap-4 p-4 hover:bg-white/5 rounded-lg transition-colors group relative cursor-pointer"
+       onClick={() => onClick(track)}
+    >
       {/* Cover Art */}
       <div className="w-40 h-40 flex-shrink-0 bg-abyss-deep rounded shadow-lg overflow-hidden relative group/cover">
           <img src={track.coverImage} className="w-full h-full object-cover" alt={track.title} />
           
           {/* Play Overlay */}
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/cover:opacity-100 transition-opacity cursor-pointer z-10">
+          <div 
+            className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/cover:opacity-100 transition-opacity z-10"
+            onClick={(e) => {
+               e.stopPropagation();
+               window.open(track.soundCloudUrl, '_blank');
+            }}
+          >
              <div className="w-12 h-12 rounded-full bg-gold text-abyss flex items-center justify-center hover:scale-110 transition-transform">
                 <Play className="w-6 h-6 fill-current ml-1" />
              </div>
           </div>
 
-          {/* Edit Overlay */}
+          {/* Delete Overlay */}
           <div className="absolute top-2 right-2 z-20 opacity-0 group-hover/cover:opacity-100 transition-opacity">
               <button 
-                onClick={(e) => { e.stopPropagation(); onEdit(index); }}
-                className="p-1.5 bg-black/70 hover:bg-gold text-white rounded-full backdrop-blur-md transition-colors shadow-lg"
-                title="Change Cover Art"
+                 onClick={(e) => { e.stopPropagation(); onDelete(track.id, track.fileName); }}
+                 className="p-1.5 bg-black/70 hover:bg-red-500 text-white rounded-full backdrop-blur-md transition-colors shadow-lg"
+                 title="Remove Mock"
               >
-                 {isUploading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Edit2 className="w-3 h-3"/>}
+                 <Trash className="w-3 h-3"/>
               </button>
           </div>
       </div>
@@ -81,12 +72,12 @@ function TrackItem({ track, index, onEdit, isUploading }: TrackItemProps) {
          <div className="flex justify-between items-start">
            <div>
              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gold text-abyss flex items-center justify-center pl-1 cursor-pointer hover:scale-105 transition-transform lg:hidden">
+                <div className="w-10 h-10 rounded-full bg-gold text-abyss flex items-center justify-center pl-1 hover:scale-105 transition-transform lg:hidden">
                   <Play className="w-5 h-5 fill-current" />
                 </div>
                 <div className="flex flex-col">
                   <span className="text-bone/60 text-xs mb-1">{track.artist}</span>
-                  <span className="text-bone font-medium text-base hover:text-white cursor-pointer truncate">{track.title}</span>
+                  <span className="text-bone font-medium text-base hover:text-white truncate">{track.title}</span>
                 </div>
              </div>
            </div>
@@ -114,10 +105,9 @@ function TrackItem({ track, index, onEdit, isUploading }: TrackItemProps) {
                ))}
             </div>
             <div className="flex items-center gap-3 text-xs text-bone/40">
-               <span className="flex items-center gap-1"><Play className="w-3 h-3" /> {track.plays}</span>
-               <span className="flex items-center gap-1"><Heart className="w-3 h-3" /> {track.likes}</span>
-               <span className="flex items-center gap-1"><RefreshCw className="w-3 h-3" /> {track.reposts}</span>
-               <span className="flex items-center gap-1"><MessageCircle className="w-3 h-3" /> {track.comments}</span>
+               <span className="flex items-center gap-1"><Play className="w-3 h-3" /> 1K</span>
+               <span className="flex items-center gap-1"><Heart className="w-3 h-3" /> 45</span>
+               <span className="flex items-center gap-1"><RefreshCw className="w-3 h-3" /> 12</span>
             </div>
          </div>
       </div>
@@ -126,58 +116,78 @@ function TrackItem({ track, index, onEdit, isUploading }: TrackItemProps) {
 }
 
 export function SoundCloud() {
-  const { images, uploadImage } = useImageSystem('soundcloud');
-  const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const activeSlotRef = useRef<number | null>(null);
+  const { deleteImage } = useImageSystem('soundcloud');
+  const [selectedMock, setSelectedMock] = useState<SoundCloudMockData | null>(null);
 
-  // Map tracks to images
-  const displayTracks: Track[] = placeholderTracks.map((placeholder, idx) => {
-      const existingImage = images.find(img => img.name === `soundcloud_track_${idx}`);
-      if (existingImage) {
-          return {
-              ...placeholder,
-              coverImage: existingImage.url,
-              isPlaceholder: false
-          };
-      }
-      return placeholder;
+  // Lazy initialize mocks
+  const [mocks, setMocks] = useState<SoundCloudMockData[]>(() => {
+    const saved = localStorage.getItem('sc_mocks');
+    if (saved) {
+        return JSON.parse(saved);
+    } 
+    // Defaults
+    return TRACKS_DATA.map((t, i) => ({
+        id: `default_${i}`,
+        title: t.title,
+        artist: t.artist,
+        coverImage: t.defaultCover || '',
+        soundCloudUrl: 'https://soundcloud.com/astrion888',
+        duration: t.duration,
+        timeAgo: t.timeAgo,
+        genre: t.genre,
+        description: "Astrion is a DJ and producer specializing in Progressive House, Melodic Techno, and sets with a strong sonic identity. I combine musical design, energy, and technology to create immersive experiences in clubs, festivals, and private events."
+    }));
   });
 
-  const handleEditClick = (index: number) => {
-      activeSlotRef.current = index;
-      fileInputRef.current?.click();
+  const saveMocks = (newMocks: SoundCloudMockData[]) => {
+      setMocks(newMocks);
+      localStorage.setItem('sc_mocks', JSON.stringify(newMocks));
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const slot = activeSlotRef.current;
-      if (e.target.files && e.target.files[0] && slot !== null) {
-          setUploadingSlot(slot);
-          try {
-              const file = e.target.files[0];
-              await uploadImage(file, `soundcloud_track_${slot}`);
-          } catch (error) {
-              console.error("Cover upload failed", error);
-              alert("Error uploading cover.");
-          } finally {
-              setUploadingSlot(null);
-              if (fileInputRef.current) fileInputRef.current.value = '';
-          }
+  const handleCreateMock = () => {
+      const template = mocks.length > 0 ? mocks[0] : {
+          id: 'temp',
+          title: 'New Frequency Session',
+          artist: 'Astrion',
+          coverImage: '/images/cover (1).jpg',
+          soundCloudUrl: 'https://soundcloud.com/astrion888',
+          duration: '1:00:00',
+          timeAgo: 'Just now',
+          genre: 'Progressive House'
+      };
+
+      const newMock: SoundCloudMockData = {
+          ...template,
+          id: `custom_${Date.now()}`,
+          title: 'New Untitled Session ' + (mocks.length + 1),
+          timeAgo: 'Just now',
+          fileName: undefined // Don't copy filename associated with another ID
+      };
+
+      const updated = [newMock, ...mocks];
+      saveMocks(updated);
+  };
+
+  const handleDeleteMock = async (id: string, fileName?: string) => {
+      if (window.confirm("Delete this visual mock?")) {
+         if (fileName) {
+             await deleteImage(fileName);
+         }
+         const updated = mocks.filter(m => m.id !== id);
+         saveMocks(updated);
       }
+  };
+
+  const handleUpdateMock = (updated: SoundCloudMockData) => {
+      const newMocks = mocks.map(m => m.id === updated.id ? updated : m);
+      saveMocks(newMocks);
+      // Keep selected mock safely updated
+      setSelectedMock(updated); 
   };
 
   return (
     <div className="animate-[fadeIn_0.5s_ease-out] min-h-screen text-bone font-sans pb-20">
       
-      {/* Hidden Global Input */}
-      <input 
-         type="file" 
-         ref={fileInputRef} 
-         className="hidden" 
-         accept="image/*"
-         onChange={handleFileChange}
-      />
-
       {/* HEADER SECTION */}
       <div className="relative mb-8 bg-abyss-panel group">
          {/* Banner */}
@@ -256,18 +266,33 @@ export function SoundCloud() {
 
              {/* Recent Header */}
              <div className="flex justify-between items-end border-b border-white/5 pb-2 mt-8">
-                 <h3 className="text-xl font-medium text-bone">Recent</h3>
+                 <div className="flex items-center gap-4">
+                     <h3 className="text-xl font-medium text-bone">Recent Visual Mocks</h3>
+                     <span className="text-xs bg-gold/20 text-gold px-2 py-0.5 rounded-full border border-gold/30">PREVIEW SYSTEM</span>
+                 </div>
+                 
+                 <button 
+                   onClick={handleCreateMock}
+                   className="flex items-center gap-2 px-3 py-1.5 bg-gold text-abyss rounded text-sm font-semibold hover:bg-white transition-colors"
+                 >
+                    <Plus className="w-4 h-4" /> Create Mock
+                 </button>
              </div>
 
              {/* Tracks List */}
              <div className="space-y-6">
-                 {displayTracks.map((track, i) => (
+                 {mocks.length === 0 && (
+                     <div className="text-center py-12 border border-dashed border-white/10 rounded bg-white/5 text-bone/40">
+                         No mocks created yet. Click "Create Mock" to start.
+                     </div>
+                 )}
+                 {mocks.map((track, i) => (
                     <TrackItem 
                        key={track.id} 
                        track={track} 
                        index={i}
-                       onEdit={handleEditClick}
-                       isUploading={uploadingSlot === i}
+                       onClick={setSelectedMock}
+                       onDelete={handleDeleteMock}
                     />
                  ))}
              </div>
@@ -359,6 +384,19 @@ export function SoundCloud() {
               </div>
           </div>
       </div>
+
+      <SoundCloudMockModal 
+          isOpen={!!selectedMock}
+          onClose={() => setSelectedMock(null)}
+          mockData={selectedMock}
+          onUpdate={handleUpdateMock}
+          onDelete={() => {
+              if (selectedMock) {
+                  handleDeleteMock(selectedMock.id, selectedMock.fileName);
+                  setSelectedMock(null);
+              }
+          }}
+      />
     </div>
   );
 }

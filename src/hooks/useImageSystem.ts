@@ -7,7 +7,7 @@ interface ImageAsset {
   fullPath: string;
 }
 
-export function useImageSystem(folderPath: 'instagram' | 'youtube' | 'soundcloud') {
+export function useImageSystem(folderPath: 'instagram' | 'youtube' | 'soundcloud' | 'studio') {
   const [images, setImages] = useState<ImageAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,13 +53,15 @@ export function useImageSystem(folderPath: 'instagram' | 'youtube' | 'soundcloud
       });
 
       setImages(resolvedImages);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching images:", err);
       // Friendly error message for missing keys/bucket
-      if (err.message && (err.message.includes('Auth') || err.message.includes('Key'))) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      
+      if (errorMessage.includes('Auth') || errorMessage.includes('Key')) {
           setError("Supabase Keys Missing");
       } else {
-          setError(err.message || "System Offline");
+          setError(errorMessage || "System Offline");
       }
     } finally {
       setLoading(false);
@@ -76,7 +78,8 @@ export function useImageSystem(folderPath: 'instagram' | 'youtube' | 'soundcloud
         const fileName = customName || file.name;
         const filePath = `${folderPath}/${fileName}`;
         
-        const { data, error } = await supabase
+        // 1. Upload
+        const { error } = await supabase
            .storage
            .from('images')
            .upload(filePath, file, {
@@ -86,13 +89,39 @@ export function useImageSystem(folderPath: 'instagram' | 'youtube' | 'soundcloud
 
         if (error) throw error;
         
-        await fetchImages(); // Refresh list
-        return data;
+        // 2. Refresh list
+        await fetchImages(); 
+
+        // 3. Return Public URL
+        const { data: { publicUrl } } = supabase
+           .storage
+           .from('images')
+           .getPublicUrl(filePath);
+           
+        // Add cache buster
+        return `${publicUrl}?t=${Date.now()}`;
      } catch (err) {
         console.error("Upload failed", err);
         throw err;
      }
   };
 
-  return { images, loading, error, uploadImage, refresh: fetchImages };
+  // Delete Logic
+  const deleteImage = async (imageName: string) => {
+      try {
+          const { error } = await supabase
+            .storage
+            .from('images')
+            .remove([`${folderPath}/${imageName}`]);
+          
+          if (error) throw error;
+
+          await fetchImages(); // Refresh list to remove local ref
+      } catch (err) {
+          console.error("Delete failed", err);
+          throw err;
+      }
+  };
+
+  return { images, loading, error, uploadImage, deleteImage, refresh: fetchImages };
 }

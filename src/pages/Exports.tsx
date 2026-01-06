@@ -1,41 +1,10 @@
-import { useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { useImageSystem } from '../hooks/useImageSystem';
-import { Copy, Check, Download, FileText } from 'lucide-react';
-import clsx from 'clsx';
+import { Download, FileText } from 'lucide-react';
 import { SimpleCarousel } from '../components/SimpleCarousel';
 import { TRACKS_DATA } from '../data/mockData';
 
-function CopyBlock({ label, text }: { label: string, text: string }) {
-  const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between items-end">
-        <label className="text-xs font-mono text-bone/50 uppercase tracking-widest">{label}</label>
-        <button 
-          onClick={handleCopy}
-          className={clsx(
-            "flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded transition-all",
-            copied ? "bg-emerald-500/10 text-emerald-500" : "bg-white/5 text-bone/60 hover:bg-white/10 hover:text-bone"
-          )}
-        >
-          {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-          {copied ? 'COPIADO' : 'COPIAR TEXTO'}
-        </button>
-      </div>
-      <div className="bg-abyss-panel p-4 rounded-lg border border-white/5 font-mono text-sm text-bone/80 whitespace-pre-wrap leading-relaxed">
-        {text}
-      </div>
-    </div>
-  );
-}
 
 interface AssetDownloadCardProps {
   title: string;
@@ -80,25 +49,15 @@ function AssetDownloadCard({ title, type, size, imageSrc, downloadUrl, fileName 
 // ... (keep helper components CopyBlock, AssetDownloadCard)
 
 export function Exports() {
-  const toneOfVoice = `Tono: calmado, preciso, selectivo.
-Sin emojis.
-Sin hype.
-Ejemplos:
-- "Frequency Session 21. Un nuevo pulso."
-- "No es música. Es resonancia."
-- "Deep frequencies. Controlled energy."`;
 
-  const bookerStatement = `Astrion es un DJ y live performer especializado en Progressive y Melodic Techno. Su propuesta es un organismo sonoro vivo, diseñado para transportar a la audiencia a través de frecuencias profundas y texturas orgánicas. Lejos del hype comercial, Astrion cultiva el silencio y la precisión.`;
+
+
 
   const { images: instagramImages } = useImageSystem('instagram');
   const { images: youtubeImages } = useImageSystem('youtube');
   const { images: soundcloudImages } = useImageSystem('soundcloud');
 
-  const riderTech = `1x Allen & Heath Xone:96
-2x Pioneer CDJ-3000 (Linked)
-1x Eventide H9 Max
-1x Roland TR-8S
-2x Booth Monitors (High Quality)`;
+
 
   // Helper to find IG post
   const getIgPost = (index: number) => instagramImages.find(img => img.name === `instagram_post_${index}`);
@@ -106,30 +65,14 @@ Ejemplos:
   return (
     <div className="animate-[fadeIn_0.5s_ease-out] max-w-7xl mx-auto space-y-20 pb-20 px-6">
       <PageHeader 
-        title="Exportaciones y Recursos" 
+        title="Banco de Imagenes" 
         subtitle="Centro de descarga de activos de marca, guías y recursos visuales." 
       />
 
-      {/* 01. Communications */}
-      <section className="space-y-8">
-        <h2 className="text-xl font-display uppercase tracking-widest text-gold/80 border-b border-gold/20 pb-4">
-          01 // Comunicaciones y Textos
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           <div className="space-y-6">
-              <CopyBlock label="Reglas de Tono de Voz" text={toneOfVoice} />
-              <CopyBlock label="Resumen de Rider Técnico" text={riderTech} />
-           </div>
-           <div>
-              <CopyBlock label="Statement para Bookers (ES)" text={bookerStatement} />
-           </div>
-        </div>
-      </section>
-
-      {/* 02. Digital Assets Layer */}
+      {/* 01. Digital Assets Layer */}
       <section className="space-y-12">
         <h2 className="text-xl font-display uppercase tracking-widest text-gold/80 border-b border-gold/20 pb-4">
-          02 // Activos Digitales y Visuales
+          Activos Digitales y Visuales
         </h2>
 
         {/* INSTAGRAM SECTION */}
@@ -138,7 +81,7 @@ Ejemplos:
               <div className="w-8 h-8 rounded bg-gradient-to-tr from-purple-500/20 to-orange-500/20 flex items-center justify-center border border-white/10">
                  <span className="font-display font-bold text-bone">IG</span>
               </div>
-              <h3 className="text-lg font-medium text-bone">Instagram System</h3>
+              <a href="https://www.instagram.com/astrion.music/" target="_blank" rel="noopener noreferrer" className="text-lg font-medium text-bone hover:text-gold transition-colors">Instagram</a>
            </div>
            
            {/* Profile & Highlights */}
@@ -209,7 +152,7 @@ Ejemplos:
               <div className="w-8 h-8 rounded bg-gradient-to-tr from-red-600/20 to-red-900/20 flex items-center justify-center border border-white/10">
                  <span className="font-display font-bold text-bone">YT</span>
               </div>
-              <h3 className="text-lg font-medium text-bone">YouTube System</h3>
+              <a href="https://www.youtube.com/@AstrionDjMusic" target="_blank" rel="noopener noreferrer" className="text-lg font-medium text-bone hover:text-gold transition-colors">YouTube</a>
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -259,7 +202,7 @@ Ejemplos:
               <div className="w-8 h-8 rounded bg-gradient-to-tr from-orange-600/20 to-orange-900/20 flex items-center justify-center border border-white/10">
                  <span className="font-display font-bold text-bone">SC</span>
               </div>
-              <h3 className="text-lg font-medium text-bone">SoundCloud System</h3>
+              <a href="https://www.soundcloud.com/astrion888" target="_blank" rel="noopener noreferrer" className="text-lg font-medium text-bone hover:text-gold transition-colors">SoundCloud</a>
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

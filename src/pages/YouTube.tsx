@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useImageSystem } from '../hooks/useImageSystem';
-import { Plus, Edit2, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Loader2, Trash } from 'lucide-react';
 import { EditableText } from '../components/EditableText';
 
 interface Video {
@@ -11,6 +11,7 @@ interface Video {
   duration: string;
   thumbnailUrl?: string;
   isPlaceholder?: boolean;
+  fileName?: string;
 }
 
 const placeholderVideos: Video[] = [
@@ -23,7 +24,7 @@ const placeholderVideos: Video[] = [
 ];
 
 export function YouTube() {
-  const { images, loading, uploadImage } = useImageSystem('youtube');
+  const { images, loading, uploadImage, deleteImage } = useImageSystem('youtube');
   const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeSlotRef = useRef<number | null>(null);
@@ -38,7 +39,8 @@ export function YouTube() {
               ...placeholder,
               thumbnailUrl: existingImage.url,
               isPlaceholder: false,
-              title: `Uploaded Session ${idx + 1}`
+              title: `Uploaded Session ${idx + 1}`,
+              fileName: existingImage.name
           };
       }
       return placeholder;
@@ -48,6 +50,13 @@ export function YouTube() {
       e.stopPropagation();
       activeSlotRef.current = slotIndex;
       fileInputRef.current?.click();
+  };
+
+  const handleDeleteClick = async (e: React.MouseEvent, fileName: string) => {
+      e.stopPropagation();
+      if (window.confirm("Delete this thumbnail?")) {
+         await deleteImage(fileName);
+      }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,8 +184,8 @@ export function YouTube() {
                   </div>
                   <div className="absolute bottom-0 left-0 h-1 bg-red-600 w-3/4" /> {/* Progress bar mock */}
 
-                  {/* Edit/Upload Button */}
-                  <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Edit/Upload/Delete Overlay */}
+                  <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-2">
                      <button 
                        onClick={(e) => handleUploadClick(e, idx)}
                        className="p-1.5 bg-black/70 hover:bg-gold text-white rounded-full backdrop-blur-md transition-colors shadow-lg"
@@ -190,6 +199,17 @@ export function YouTube() {
                            <Edit2 className="w-3 h-3" />
                         )}
                      </button>
+
+                     {/* Delete Button */}
+                     {!video.isPlaceholder && video.fileName && (
+                         <button 
+                             onClick={(e) => handleDeleteClick(e, video.fileName!)}
+                             className="p-1.5 bg-black/70 hover:bg-red-500 text-white rounded-full backdrop-blur-md transition-colors shadow-lg"
+                             title="Remove Thumbnail"
+                         >
+                            <Trash className="w-3 h-3" />
+                         </button>
+                     )}
                   </div>
                </div>
 

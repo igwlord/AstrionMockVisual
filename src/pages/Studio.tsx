@@ -6,11 +6,10 @@ import {
     Lock, Unlock, Eye, EyeOff,
     RotateCcw, RotateCw, Menu, X,
     Brush, Square, Copy, CheckSquare, Eraser, GripVertical,
-    Link, Unlink, Activity, Maximize2, RotateCcw as ResetIcon, Grid
+    Link, Unlink, Activity, Maximize2, RotateCcw as ResetIcon, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
-import { Tooltip } from '../components/Tooltip';
 import { useNotification } from '../components/Notification';
 import { Separator } from '../components/Separator';
 import { ContextMenu } from '../components/ContextMenu';
@@ -156,13 +155,19 @@ export function Studio() {
   const [customSize, setCustomSize] = useState({ width: 1080, height: 1080 });
   const [showCustomSizeModal, setShowCustomSizeModal] = useState(false);
   const [activeTool, setActiveTool] = useState<ToolType>('image');
-  
-  // Auto-select Image tool on mount
-  useEffect(() => {
-    setActiveTool('image');
-    setActiveTab('properties');
-  }, []);
   const [activeTab, setActiveTab] = useState<PanelTab>('properties');
+  
+  // Auto-select Image tool on mount ONLY if no saved state exists
+  useEffect(() => {
+    if (!initialized.current) {
+      const saved = localStorage.getItem('astrion_studio_v5_state');
+      if (!saved) {
+        // Only set defaults if there's no saved state
+        setActiveTool('image');
+        setActiveTab('properties');
+      }
+    }
+  }, []);
   
   // Grouped background state
   const [backgroundState, setBackgroundState] = useState({
@@ -184,7 +189,6 @@ export function Studio() {
   const [viewportOffset, setViewportOffset] = useState({ x: 0, y: 0 });
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
-  const [showGrid, setShowGrid] = useState(true);
 
   const [layers, setLayers] = useState<Layer[]>([]);
   
@@ -207,34 +211,41 @@ export function Studio() {
   const [showSuggestedColors, setShowSuggestedColors] = useState(false);
   const [activeBgModal, setActiveBgModal] = useState<'config' | 'filters' | 'adjustments'>('config');
   const [filterIntensity, setFilterIntensity] = useState(100);
+  const [sizeUnit, setSizeUnit] = useState<'px' | 'cm'>('px');
   
   // Temporary text properties state
   const [tempTextProps, setTempTextProps] = useState({
+    text: '',
     fontSize: 120,
     color: '#E6E2DA',
     letterSpacing: 0,
     fontWeight: 'normal' as string,
-    fontStyle: 'normal' as string
+    fontStyle: 'normal' as string,
+    fontFamily: FONT_OPTIONS[0].value
   });
     
   const fileInputRef = useRef<HTMLInputElement>(null);
   const initialized = useRef(false);
   const historyDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const initialBgStateRef = useRef<{ scale: number; offset: { x: number; y: number }; filters: ImageFilters } | null>(null);
 
-  // Persistence - Expanded
+  // Restore state from localStorage on mount
   useEffect(() => {
     if (!initialized.current) {
         const saved = localStorage.getItem('astrion_studio_v5_state');
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
+                // Restore all state in the correct order
                 if (parsed.layers) setLayers(parsed.layers);
                 if (parsed.backgroundState) setBackgroundState(parsed.backgroundState);
                 if (parsed.brushState) setBrushState(parsed.brushState);
                 if (parsed.activeTool) setActiveTool(parsed.activeTool);
+                if (parsed.activeTab) setActiveTab(parsed.activeTab);
                 if (parsed.zoom !== undefined) setZoom(parsed.zoom);
                 if (parsed.viewportOffset) setViewportOffset(parsed.viewportOffset);
                 if (parsed.activePreset) setActivePreset(parsed.activePreset);
+                if (parsed.filterIntensity !== undefined) setFilterIntensity(parsed.filterIntensity);
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             } catch (_e) { /* Ignore JSON parse errors */ }
         }
@@ -244,20 +255,94 @@ export function Studio() {
 
   useEffect(() => {
     if (initialized.current) {
-       localStorage.setItem('astrion_studio_v5_state', JSON.stringify({ 
-         layers, 
-         backgroundState,
-         brushState,
-         activeTool,
-         zoom,
-         viewportOffset,
-         activePreset
-       }));
+      const MAX_IMAGE_SIZE = 100 * 1024; // 100KB max per image
+      const MAX_TOTAL_SIZE = 2 * 1024 * 1024; // 2MB max total
+      
+      // Prepare state without large images
+      const stateToSave = { 
+        layers: layers.map(l => {
+          // Don't save image data if it's too large
+          if (l.src && l.src.length > MAX_IMAGE_SIZE) {
+            return { ...l, src: undefined, hasLargeImage: true };
+          }
+          return l;
+        }), 
+        backgroundState: {
+          ...backgroundState,
+          // Don't save background image if it's too large
+          image: (backgroundState.image && backgroundState.image.length > MAX_IMAGE_SIZE) ? null : backgroundState.image,
+          hasLargeImage: backgroundState.image && backgroundState.image.length > MAX_IMAGE_SIZE
+        },
+        brushState,
+        activeTool,
+        activeTab,
+        zoom,
+        viewportOffset,
+        activePreset,
+        filterIntensity
+      };
+      
+      const jsonString = JSON.stringify(stateToSave);
+      const sizeBytes = new Blob([jsonString]).size;
+      
+      // If total size exceeds limit, don't save images at all
+      if (sizeBytes > MAX_TOTAL_SIZE) {
+        const minimalState = {
+          layers: layers.map(l => ({ ...l, src: undefined })),
+          backgroundState: { ...backgroundState, image: null },
+          brushState,
+          activeTool,
+          activeTab,
+          zoom,
+          viewportOffset,
+          activePreset,
+          filterIntensity
+        };
+        try {
+          localStorage.setItem('astrion_studio_v5_state', JSON.stringify(minimalState));
+        } catch (error) {
+          console.warn('localStorage quota exceeded, unable to save state');
+        }
+        return;
+      }
+      
+      try {
+        localStorage.setItem('astrion_studio_v5_state', jsonString);
+      } catch (error) {
+        // Don't save images to localStorage if quota exceeded
+        if (error instanceof Error && (error.name === 'QuotaExceededError' || error.message.includes('quota'))) {
+          const stateWithoutImages = {
+            layers: layers.map(l => ({ ...l, src: undefined })),
+            backgroundState: { ...backgroundState, image: null },
+            brushState,
+            activeTool,
+            activeTab,
+            zoom,
+            viewportOffset,
+            activePreset,
+            filterIntensity
+          };
+          try {
+            localStorage.setItem('astrion_studio_v5_state', JSON.stringify(stateWithoutImages));
+          } catch (e) {
+            console.warn('localStorage quota exceeded, unable to save any state');
+          }
+        }
+      }
     }
-  }, [layers, backgroundState, brushState, activeTool, zoom, viewportOffset, activePreset]);
+  }, [layers, backgroundState, brushState, activeTool, activeTab, zoom, viewportOffset, activePreset, filterIntensity]);
 
   // History & Undo/Redo - Optimized with debounce
   useEffect(() => { if (history.length === 0 && layers.length === 0) { setHistory([[]]); setHistoryIndex(0); } }, [history.length, layers.length]);
+  
+  // Use refs to access current history state without stale closures
+  const historyRef = useRef(history);
+  const historyIndexRef = useRef(historyIndex);
+  
+  useEffect(() => {
+      historyRef.current = history;
+      historyIndexRef.current = historyIndex;
+  }, [history, historyIndex]);
   
   const commitToHistory = useCallback((newLayers: Layer[]) => {
       // Debounce history commits to avoid excessive states
@@ -266,7 +351,11 @@ export function Studio() {
       }
       
       historyDebounceRef.current = setTimeout(() => {
-          const current = history.slice(0, historyIndex + 1);
+          // Access current values via refs to avoid stale closures
+          const currentHistory = historyRef.current;
+          const currentIndex = historyIndexRef.current;
+          const current = currentHistory.slice(0, currentIndex + 1);
+          
           // Avoid duplicate states
           const lastState = current[current.length - 1];
           const isDuplicate = lastState && JSON.stringify(lastState) === JSON.stringify(newLayers);
@@ -277,7 +366,7 @@ export function Studio() {
               setHistoryIndex(next.length - 1);
           }
       }, 150); // 150ms debounce
-  }, [historyIndex, history]);
+  }, []);
   const updateLayers = (updates: (prev: Layer[]) => Layer[]) => {
      setLayers(prev => { const next = updates(prev); commitToHistory(next); return next; });
   };
@@ -323,10 +412,15 @@ export function Studio() {
           if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
           if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelection(); }
           
-          // Layer navigation shortcuts
+          // Layer navigation shortcuts - UI is reversed, so we need to work with reversed indices
+          // In reversed UI: layers[length-1] is at top (visual index 0), layers[0] is at bottom
           if (e.key === 'ArrowUp' && (e.ctrlKey || e.metaKey) && selectedLayerIds.length > 0) {
               e.preventDefault();
               const currentIndex = layers.findIndex(l => l.id === selectedLayerIds[0]);
+              if (currentIndex === -1) return;
+              // In reversed UI, ArrowUp means go to higher visual position = lower array index
+              // Visual position = (layers.length - 1 - arrayIndex)
+              // To go up visually, we need to decrease array index
               if (currentIndex > 0) {
                   setSelectedLayerIds([layers[currentIndex - 1].id]);
                   setActiveTab('properties');
@@ -335,53 +429,379 @@ export function Studio() {
           if (e.key === 'ArrowDown' && (e.ctrlKey || e.metaKey) && selectedLayerIds.length > 0) {
               e.preventDefault();
               const currentIndex = layers.findIndex(l => l.id === selectedLayerIds[0]);
+              if (currentIndex === -1) return;
+              // In reversed UI, ArrowDown means go to lower visual position = higher array index
+              // To go down visually, we need to increase array index
               if (currentIndex < layers.length - 1) {
                   setSelectedLayerIds([layers[currentIndex + 1].id]);
                   setActiveTab('properties');
               }
           }
           
-          // Brush Size Shortcuts
-          if (['+', '=', 'NumpadAdd'].includes(e.key)) {
+          // Brush Size Shortcuts - Only when brush or eraser is active
+          if ((activeTool === 'brush' || activeTool === 'eraser') && ['+', '=', 'NumpadAdd'].includes(e.key)) {
+              e.preventDefault();
               setBrushState(prev => ({ ...prev, size: Math.min(100, prev.size + 2) }));
           }
-          if (['-', '_', 'NumpadSubtract'].includes(e.key)) {
+          if ((activeTool === 'brush' || activeTool === 'eraser') && ['-', '_', 'NumpadSubtract'].includes(e.key)) {
+              e.preventDefault();
               setBrushState(prev => ({ ...prev, size: Math.max(1, prev.size - 2) }));
           }
       };
       const handleKeyUp = (e: KeyboardEvent) => { if (e.code === 'Space') setIsSpacePressed(false); };
       window.addEventListener('keydown', handleKeyDown); window.addEventListener('keyup', handleKeyUp);
       return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); };
-  }, [selectedLayerIds, undo, redo, deleteSelection, layers]); 
+  }, [selectedLayerIds, undo, redo, deleteSelection, layers, activeTool]); 
 
   // Helpers
   const addToRecentColors = (color: string) => {
       if (!recentColors.includes(color)) setRecentColors(prev => [color, ...prev].slice(0, 10));
   };
 
-  // Apply filter with intensity
+  // Export canvas to PNG
+  const handleDownloadPNG = async () => {
+      try {
+          // Create a canvas with the exact dimensions of the preset
+          const canvas = document.createElement('canvas');
+          canvas.width = activePreset.width;
+          canvas.height = activePreset.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+              showNotification('No se pudo crear el contexto del canvas', 'error');
+              return;
+          }
+
+          // Fill background
+          ctx.fillStyle = '#050508';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          // Draw background image if exists
+          if (backgroundState.image) {
+              const bgImg = new Image();
+              await new Promise((resolve, reject) => {
+                  bgImg.onload = () => {
+                      const combinedFilter = combineFilters(
+                          backgroundState.filters.preset || '', 
+                          filterIntensity,
+                          {
+                              brightness: backgroundState.filters.brightness,
+                              contrast: backgroundState.filters.contrast,
+                              saturation: backgroundState.filters.saturation,
+                              blur: backgroundState.filters.blur
+                          }
+                      );
+                      
+                      // Apply filters using canvas filters
+                      const tempCanvas = document.createElement('canvas');
+                      tempCanvas.width = bgImg.width;
+                      tempCanvas.height = bgImg.height;
+                      const tempCtx = tempCanvas.getContext('2d');
+                      if (tempCtx) {
+                          tempCtx.filter = combinedFilter || 'none';
+                          tempCtx.drawImage(bgImg, 0, 0);
+                          
+                          const scale = backgroundState.scale;
+                          const offsetX = backgroundState.offset.x;
+                          const offsetY = backgroundState.offset.y;
+                          
+                          ctx.drawImage(
+                              tempCanvas,
+                              offsetX,
+                              offsetY,
+                              bgImg.width * scale,
+                              bgImg.height * scale
+                          );
+                      }
+                      resolve(null);
+                  };
+                  bgImg.onerror = reject;
+                  bgImg.src = backgroundState.image;
+              });
+          }
+
+          // Draw layers
+          for (const layer of layers) {
+              if (!layer.visible) continue;
+
+              ctx.save();
+              
+              // Transform to layer position and rotation
+              const centerX = layer.x;
+              const centerY = layer.y;
+              ctx.translate(centerX, centerY);
+              ctx.rotate((layer.rotation || 0) * Math.PI / 180);
+              ctx.scale(layer.scale || 1, layer.scale || 1);
+
+              // Apply opacity
+              ctx.globalAlpha = layer.opacity || 1;
+
+              if (layer.type === 'text' && layer.text) {
+                  ctx.font = `${layer.fontWeight || 'normal'} ${layer.fontStyle || 'normal'} ${layer.fontSize || 16}px ${layer.fontFamily || 'system-ui'}`;
+                  ctx.fillStyle = layer.color || '#ffffff';
+                  ctx.textAlign = (layer.textAlign as CanvasTextAlign) || 'center';
+                  ctx.textBaseline = 'middle';
+                  
+                  // Handle curved text (simplified - draw as straight for now)
+                  ctx.fillText(layer.text, 0, 0);
+              } else if (layer.type === 'image' && layer.src) {
+                  const img = new Image();
+                  await new Promise((resolve, reject) => {
+                      img.onload = () => {
+                          const filters = layer.filters ? combineFilters(
+                              layer.filters.preset || '',
+                              100,
+                              {
+                                  brightness: layer.filters.brightness || 100,
+                                  contrast: layer.filters.contrast || 100,
+                                  saturation: layer.filters.saturation || 100,
+                                  blur: layer.filters.blur || 0
+                              }
+                          ) : 'none';
+                          
+                          const tempCanvas = document.createElement('canvas');
+                          tempCanvas.width = img.width;
+                          tempCanvas.height = img.height;
+                          const tempCtx = tempCanvas.getContext('2d');
+                          if (tempCtx) {
+                              tempCtx.filter = filters;
+                              tempCtx.drawImage(img, 0, 0);
+                              ctx.drawImage(tempCanvas, -(layer.width || img.width) / 2, -(layer.height || img.height) / 2, layer.width || img.width, layer.height || img.height);
+                          }
+                          resolve(null);
+                      };
+                      img.onerror = reject;
+                      img.src = layer.src;
+                  });
+              } else if (layer.type === 'rect' || layer.type === 'circle' || layer.type === 'triangle' || layer.type === 'polygon') {
+                  const width = layer.width || 100;
+                  const height = layer.height || 100;
+                  
+                  if (layer.fill && layer.fillColor) {
+                      ctx.fillStyle = layer.fillColor;
+                      if (layer.type === 'rect') {
+                          ctx.fillRect(-width/2, -height/2, width, height);
+                      } else if (layer.type === 'circle') {
+                          ctx.beginPath();
+                          ctx.arc(0, 0, width/2, 0, Math.PI * 2);
+                          ctx.fill();
+                      } else if (layer.type === 'triangle') {
+                          ctx.beginPath();
+                          ctx.moveTo(0, -height/2);
+                          ctx.lineTo(-width/2, height/2);
+                          ctx.lineTo(width/2, height/2);
+                          ctx.closePath();
+                          ctx.fill();
+                      } else if (layer.type === 'polygon') {
+                          const sides = layer.sides || 5;
+                          ctx.beginPath();
+                          for (let i = 0; i < sides; i++) {
+                              const angle = (i * 2 * Math.PI) / sides - Math.PI/2;
+                              const x = Math.cos(angle) * width/2;
+                              const y = Math.sin(angle) * height/2;
+                              if (i === 0) ctx.moveTo(x, y);
+                              else ctx.lineTo(x, y);
+                          }
+                          ctx.closePath();
+                          ctx.fill();
+                      }
+                  }
+                  
+                  if (layer.stroke && layer.strokeColor) {
+                      ctx.strokeStyle = layer.strokeColor;
+                      ctx.lineWidth = layer.strokeWidth || 1;
+                      if (layer.strokeDash) {
+                          ctx.setLineDash(layer.strokeDash);
+                      }
+                      if (layer.type === 'rect') {
+                          ctx.strokeRect(-width/2, -height/2, width, height);
+                      } else if (layer.type === 'circle') {
+                          ctx.beginPath();
+                          ctx.arc(0, 0, width/2, 0, Math.PI * 2);
+                          ctx.stroke();
+                      } else if (layer.type === 'triangle') {
+                          ctx.beginPath();
+                          ctx.moveTo(0, -height/2);
+                          ctx.lineTo(-width/2, height/2);
+                          ctx.lineTo(width/2, height/2);
+                          ctx.closePath();
+                          ctx.stroke();
+                      } else if (layer.type === 'polygon') {
+                          const sides = layer.sides || 5;
+                          ctx.beginPath();
+                          for (let i = 0; i < sides; i++) {
+                              const angle = (i * 2 * Math.PI) / sides - Math.PI/2;
+                              const x = Math.cos(angle) * width/2;
+                              const y = Math.sin(angle) * height/2;
+                              if (i === 0) ctx.moveTo(x, y);
+                              else ctx.lineTo(x, y);
+                          }
+                          ctx.closePath();
+                          ctx.stroke();
+                      }
+                  }
+              } else if (layer.type === 'line') {
+                  if (layer.stroke && layer.strokeColor) {
+                      ctx.strokeStyle = layer.strokeColor;
+                      ctx.lineWidth = layer.strokeWidth || 1;
+                      ctx.beginPath();
+                      ctx.moveTo(-(layer.width || 100)/2, 0);
+                      ctx.lineTo((layer.width || 100)/2, 0);
+                      ctx.stroke();
+                  }
+              } else if (layer.type === 'drawing' && layer.strokes) {
+                  for (const stroke of layer.strokes) {
+                      if (stroke.points.length < 2) continue;
+                      ctx.strokeStyle = stroke.color;
+                      ctx.lineWidth = stroke.width;
+                      ctx.lineCap = 'round';
+                      ctx.lineJoin = 'round';
+                      ctx.globalAlpha = stroke.opacity ?? 1;
+                      if (stroke.blur) {
+                          ctx.shadowBlur = stroke.blur;
+                          ctx.shadowColor = stroke.color;
+                      }
+                      ctx.beginPath();
+                      for (let i = 0; i < stroke.points.length; i++) {
+                          const pt = stroke.points[i];
+                          if (i === 0) ctx.moveTo(pt.x - centerX, pt.y - centerY);
+                          else ctx.lineTo(pt.x - centerX, pt.y - centerY);
+                      }
+                      ctx.stroke();
+                      ctx.shadowBlur = 0;
+                  }
+              }
+
+              ctx.restore();
+          }
+
+          // Download
+          canvas.toBlob((blob) => {
+              if (!blob) {
+                  showNotification('Error al generar la imagen', 'error');
+                  return;
+              }
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `astrion-studio-${activePreset.label.replace(/\s+/g, '-')}-${Date.now()}.png`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              showNotification('Imagen descargada correctamente', 'success');
+          }, 'image/png', 1.0); // Maximum quality
+      } catch (error) {
+          console.error('Error exporting PNG:', error);
+          showNotification('Error al exportar la imagen', 'error');
+      }
+  };
+
+  // Apply filter with intensity (0 = no filter, 100 = full filter)
   const applyFilterWithIntensity = (preset: string, intensity: number): string => {
       if (!preset || intensity === 0) return '';
-      if (intensity === 100) return preset;
+      if (intensity === 100) return preset.trim();
       
-      // For filters, we need to interpolate the values
-      // This is a simplified approach - for more complex filters, we'd need to parse and interpolate each function
       const intensityRatio = intensity / 100;
       
-      // For grayscale, sepia, etc., we can directly interpolate
-      if (preset.includes('grayscale')) {
-          return `grayscale(${intensityRatio})`;
-      }
-      if (preset.includes('sepia')) {
-          const sepiaMatch = preset.match(/sepia\(([\d.]+)\)/);
-          if (sepiaMatch) {
-              const sepiaValue = parseFloat(sepiaMatch[1]);
-              return preset.replace(/sepia\([\d.]+\)/, `sepia(${sepiaValue * intensityRatio})`);
+      // Parse and interpolate each filter function
+      const filterFunctions = preset.trim().split(/\s+(?=\w+\()/);
+      const interpolatedFunctions = filterFunctions.map(func => {
+          // grayscale
+          if (func.startsWith('grayscale(')) {
+              const match = func.match(/grayscale\(([\d.]+)\)/);
+              if (match) {
+                  const value = parseFloat(match[1]);
+                  return `grayscale(${value * intensityRatio})`;
+              }
+              return `grayscale(${intensityRatio})`;
           }
+          // sepia
+          if (func.startsWith('sepia(')) {
+              const match = func.match(/sepia\(([\d.]+)\)/);
+              if (match) {
+                  const value = parseFloat(match[1]);
+                  return `sepia(${value * intensityRatio})`;
+              }
+              return `sepia(${intensityRatio})`;
+          }
+          // contrast
+          if (func.startsWith('contrast(')) {
+              const match = func.match(/contrast\(([\d.]+)\)/);
+              if (match) {
+                  const value = parseFloat(match[1]);
+                  // Interpolate between 1 (no contrast) and value
+                  const interpolated = 1 + (value - 1) * intensityRatio;
+                  return `contrast(${interpolated})`;
+              }
+              return func; // Fallback if regex doesn't match
+          }
+          // saturate
+          if (func.startsWith('saturate(')) {
+              const match = func.match(/saturate\(([\d.]+)\)/);
+              if (match) {
+                  const value = parseFloat(match[1]);
+                  // Interpolate between 1 (no saturation change) and value
+                  const interpolated = 1 + (value - 1) * intensityRatio;
+                  return `saturate(${interpolated})`;
+              }
+              return func; // Fallback if regex doesn't match
+          }
+          // brightness
+          if (func.startsWith('brightness(')) {
+              const match = func.match(/brightness\(([\d.]+)\)/);
+              if (match) {
+                  const value = parseFloat(match[1]);
+                  // Interpolate between 1 (no brightness change) and value
+                  const interpolated = 1 + (value - 1) * intensityRatio;
+                  return `brightness(${interpolated})`;
+              }
+              return func; // Fallback if regex doesn't match
+          }
+          // hue-rotate
+          if (func.startsWith('hue-rotate(')) {
+              const match = func.match(/hue-rotate\(([\d.]+)deg\)/);
+              if (match) {
+                  const value = parseFloat(match[1]);
+                  return `hue-rotate(${value * intensityRatio}deg)`;
+              }
+          }
+          // For other filters, apply at full intensity (fallback)
+          return func;
+      });
+      
+      return interpolatedFunctions.join(' ').trim();
+  };
+
+  // Combine preset filters with individual adjustments, avoiding duplicates
+  const combineFilters = (preset: string, intensity: number, adjustments: { brightness: number; contrast: number; saturation: number; blur: number }): string => {
+      // Parse preset to extract filter functions
+      const presetFilter = applyFilterWithIntensity(preset, intensity);
+      if (!presetFilter) {
+          // No preset, just use adjustments
+          return `brightness(${adjustments.brightness / 100}) contrast(${adjustments.contrast / 100}) saturate(${adjustments.saturation / 100}) blur(${adjustments.blur}px)`.trim();
       }
       
-      // For complex filters, use opacity blending approach
-      return preset;
+      // Parse preset filter string into individual functions
+      const presetFunctions = presetFilter.trim().split(/\s+(?=\w+\()/);
+      const functionMap = new Map<string, string>();
+      
+      // Extract function names and values from preset
+      presetFunctions.forEach(func => {
+          const match = func.match(/^(\w+(?:-\w+)?)\(/);
+          if (match) {
+              const funcName = match[1];
+              functionMap.set(funcName, func);
+          }
+      });
+      
+      // Override preset functions with individual adjustments
+      functionMap.set('brightness', `brightness(${adjustments.brightness / 100})`);
+      functionMap.set('contrast', `contrast(${adjustments.contrast / 100})`);
+      functionMap.set('saturate', `saturate(${adjustments.saturation / 100})`);
+      functionMap.set('blur', `blur(${adjustments.blur}px)`);
+      
+      // Combine all functions
+      return Array.from(functionMap.values()).join(' ').trim();
   };
   
   // File validation
@@ -429,12 +849,22 @@ export function Studio() {
              const img = new Image();
              img.onload = () => {
                  const scale = Math.min(activePreset.width / img.width, activePreset.height / img.height);
+                 const initialOffset = { x: (activePreset.width - img.width * scale) / 2, y: (activePreset.height - img.height * scale) / 2 };
+                 const initialFilters = { brightness: 100, contrast: 100, saturation: 100, blur: 0, preset: '' };
+                 
+                 // Save initial state for reset functionality
+                 initialBgStateRef.current = {
+                     scale,
+                     offset: initialOffset,
+                     filters: initialFilters
+                 };
+                 
                  setBackgroundState(prev => ({
                      ...prev,
                      image: src,
                      scale,
-                     filters: { brightness: 100, contrast: 100, saturation: 100, blur: 0, preset: '' },
-                     offset: { x: (activePreset.width - img.width * scale) / 2, y: (activePreset.height - img.height * scale) / 2 }
+                     filters: initialFilters,
+                     offset: initialOffset
                  }));
                  if (fileInputRef.current) fileInputRef.current.value = '';
                  showNotification('Imagen de fondo cargada correctamente', 'success');
@@ -461,9 +891,9 @@ export function Studio() {
           opacity: 1,
           aspectLocked: true, 
           ...(type === 'text' && { 
-              text: 'Double Click to Edit', 
+              text: tempTextProps.text || 'Nuevo Texto', 
               fontSize: tempTextProps.fontSize, 
-              fontFamily: 'Satoshi, sans-serif', 
+              fontFamily: tempTextProps.fontFamily || FONT_OPTIONS[0].value, 
               color: tempTextProps.color, 
               letterSpacing: tempTextProps.letterSpacing,
               fontWeight: tempTextProps.fontWeight,
@@ -501,6 +931,9 @@ export function Studio() {
        initialX: number;
        initialY: number;
        initialScale?: number;
+       initialWidth?: number;
+       initialHeight?: number;
+       resizeHandle?: 'TL' | 'TR' | 'BL' | 'BR';
        pointerId?: number;
        lastX?: number;
        lastY?: number;
@@ -538,14 +971,8 @@ export function Studio() {
            }
        }
 
-       if (activeTool === 'text') {
-            const frame = document.getElementById('canvas-frame')?.getBoundingClientRect(); if(!frame) return;
-            const x = (e.clientX - frame.left)/zoom;
-            const y = (e.clientY - frame.top)/zoom;
-            addLayer('text', {x, y});
-            setActiveTool('select');
-            return;
-       }
+       // Text tool no longer creates text on click - user must use "Agregar" button
+       // Removed automatic text creation on canvas click
 
        // BRUSH & ERASER & LINE
        if (activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'line') {
@@ -648,6 +1075,12 @@ export function Studio() {
                state.type = 'resize';
                state.id = id;
                state.initialScale = layer?.scale || 1;
+               state.initialWidth = layer?.width || 100;
+               state.initialHeight = layer?.height || 100;
+               // resizeHandle is set by the handle's onPointerDown handler
+               if (!state.resizeHandle) {
+                   state.resizeHandle = 'BR'; // Default to bottom-right if not set
+               }
            } else {
                state.type = 'layer';
                state.id = id;
@@ -656,7 +1089,10 @@ export function Studio() {
            }
        } else if (type === 'bg' && backgroundState.image) {
            if(backgroundState.locked) {
+               // When background is locked, allow clicks to pass through to layers
                state.type = 'none';
+               // Don't clear selectedLayerIds - allow layer selection even when bg is locked
+               return; // Exit early to allow event to propagate to layers
            } else {
                state.type = 'bg';
                state.initialX = backgroundState.offset.x;
@@ -708,8 +1144,66 @@ export function Studio() {
                offset: { x: state.initialX + dx/zoom, y: state.initialY + dy/zoom }
            }));
        } else if (state.type === 'resize' && state.id) {
-            const scaleChange = dx * 0.005;
-            updateLayerDirect(state.id, { scale: Math.max(0.1, (state.initialScale||1) + scaleChange) });
+            const layer = layers.find(l => l.id === state.id);
+            if (!layer || !state.initialWidth || !state.initialHeight) return;
+            
+            const deltaX = dx / zoom;
+            const deltaY = dy / zoom;
+            const handle = state.resizeHandle || 'BR';
+            
+            if (layer.aspectLocked) {
+                // Maintain aspect ratio - use scale
+                // Calculate distance from initial position to determine scale change
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                // For all handles, moving away from center increases size
+                const scaleChange = distance * 0.005;
+                updateLayerDirect(state.id, { scale: Math.max(0.1, (state.initialScale||1) + scaleChange) });
+            } else {
+                // Free resize - adjust based on handle position
+                // dx and dy are positive when dragging down/right, negative when dragging up/left
+                let newWidth = state.initialWidth;
+                let newHeight = state.initialHeight;
+                let newX = layer.x;
+                let newY = layer.y;
+                
+                switch (handle) {
+                    case 'TL': // Top-left: dragging down/right (positive delta) should increase size
+                        // When dragging TL handle down/right, width and height increase
+                        newWidth = Math.max(10, state.initialWidth + deltaX);
+                        newHeight = Math.max(10, state.initialHeight + deltaY);
+                        // Move origin point to keep handle in place
+                        newX = layer.x - deltaX;
+                        newY = layer.y - deltaY;
+                        break;
+                    case 'TR': // Top-right: dragging down/left increases height, dragging up/right increases width
+                        // When dragging TR handle, positive deltaY increases height, negative deltaX increases width
+                        newWidth = Math.max(10, state.initialWidth - deltaX);
+                        newHeight = Math.max(10, state.initialHeight + deltaY);
+                        // Only adjust Y position
+                        newY = layer.y - deltaY;
+                        break;
+                    case 'BL': // Bottom-left: dragging up/right increases width, dragging down/left increases height
+                        // When dragging BL handle, positive deltaX increases width, negative deltaY increases height
+                        newWidth = Math.max(10, state.initialWidth + deltaX);
+                        newHeight = Math.max(10, state.initialHeight - deltaY);
+                        // Only adjust X position
+                        newX = layer.x - deltaX;
+                        break;
+                    case 'BR': // Bottom-right: dragging down/right (positive delta) increases size
+                    default:
+                        // When dragging BR handle down/right, both width and height increase
+                        newWidth = Math.max(10, state.initialWidth + deltaX);
+                        newHeight = Math.max(10, state.initialHeight + deltaY);
+                        break;
+                }
+                
+                updateLayerDirect(state.id, { 
+                    width: newWidth, 
+                    height: newHeight,
+                    x: newX,
+                    y: newY
+                });
+            }
        } else if (state.type === 'layer' && state.lastX && state.lastY) {
            const draggingIds = selectedLayerIds.includes(state.id!) ? selectedLayerIds : [state.id!];
            
@@ -761,32 +1255,12 @@ export function Studio() {
         <div className={clsx("md:w-16 bg-abyss-panel border-r border-white/5 flex flex-col items-center py-6 z-30 relative h-full", isMobileMenuOpen ? "w-16 left-0 absolute" : "-left-16 md:left-0")}>
             <div className="mb-6"><Layout className="w-6 h-6 text-gold" /></div>
             <div className="flex flex-col gap-3 w-full px-2 items-center">
-                <Tooltip content="Gestiona imágenes de fondo del canvas" side="right">
-                    <div>
-                        <TooltipButton icon={ImageIcon} label="Imagen" tooltip="Gestiona imágenes de fondo" active={activeTool === 'image'} onClick={() => { setActiveTool('image'); setActiveTab('properties'); }} />
-                    </div>
-                </Tooltip>
-                <Tooltip content="Selecciona y mueve elementos. Shift+Click para selección múltiple" side="right">
-                    <div>
-                        <TooltipButton icon={MousePointer2} label="Seleccionar" tooltip="Selecciona elementos. Shift+Click para múltiple" active={activeTool === 'select'} onClick={() => setActiveTool('select')} />
-                    </div>
-                </Tooltip>
-                <Tooltip content="Dibuja libremente en el canvas" side="right">
-                    <div>
-                        <TooltipButton icon={Brush} label="Pincel" tooltip="Dibuja libremente" active={activeTool === 'brush'} onClick={() => setActiveTool('brush')} />
-                    </div>
-                </Tooltip>
-                <Tooltip content="Borra partes de capas seleccionadas" side="right">
-                    <div>
-                        <TooltipButton icon={Eraser} label="Borrador" tooltip="Borra partes de capas" active={activeTool === 'eraser'} onClick={() => setActiveTool('eraser')} />
-                    </div>
-                </Tooltip>
+                <TooltipButton icon={ImageIcon} label="Imagen" tooltip="Gestiona imágenes de fondo" active={activeTool === 'image'} onClick={() => { setActiveTool('image'); setActiveTab('properties'); }} />
+                <TooltipButton icon={MousePointer2} label="Seleccionar" tooltip="Selecciona elementos. Shift+Click para múltiple" active={activeTool === 'select'} onClick={() => setActiveTool('select')} />
+                <TooltipButton icon={Brush} label="Pincel" tooltip="Dibuja libremente" active={activeTool === 'brush'} onClick={() => setActiveTool('brush')} />
+                <TooltipButton icon={Eraser} label="Borrador" tooltip="Borra partes de capas" active={activeTool === 'eraser'} onClick={() => setActiveTool('eraser')} />
                 <div className="relative group">
-                    <Tooltip content="Agrega formas al canvas" side="right">
-                        <div>
-                            <TooltipButton icon={Square} label="Formas" tooltip="Agrega formas" active={activeTool.includes('shape')} onClick={() => setIsShapeMenuOpen(!isShapeMenuOpen)} />
-                        </div>
-                    </Tooltip>
+                    <TooltipButton icon={Square} label="Formas" tooltip="Agrega formas" active={activeTool.includes('shape')} onClick={() => setIsShapeMenuOpen(!isShapeMenuOpen)} />
                     <AnimatePresence>
                         {isShapeMenuOpen && (
                             <>
@@ -797,21 +1271,11 @@ export function Studio() {
                                     exit={{opacity:0, x:-10}} 
                                     className="absolute left-full top-0 ml-4 bg-abyss border border-white/10 rounded-xl p-2 flex flex-col gap-2 shadow-xl z-[60] w-36"
                                 >
-                                    <Tooltip content="Agrega un rectángulo" side="right">
-                                        <button onClick={() => { addLayer('rect'); setIsShapeMenuOpen(false); }} className="flex items-center gap-2 p-2 hover:bg-white/10 rounded text-left text-xs text-bone focus:outline-none focus:ring-2 focus:ring-gold/50" aria-label="Agregar rectángulo"><Square size={14}/> Rectángulo</button>
-                                    </Tooltip>
-                                    <Tooltip content="Agrega un círculo" side="right">
-                                        <button onClick={() => { addLayer('circle'); setIsShapeMenuOpen(false); }} className="flex items-center gap-2 p-2 hover:bg-white/10 rounded text-left text-xs text-bone focus:outline-none focus:ring-2 focus:ring-gold/50" aria-label="Agregar círculo"><CheckSquare size={14} className="rounded-full"/> Círculo</button>
-                                    </Tooltip>
-                                    <Tooltip content="Agrega un triángulo" side="right">
-                                        <button onClick={() => { addLayer('triangle'); setIsShapeMenuOpen(false); }} className="flex items-center gap-2 p-2 hover:bg-white/10 rounded text-left text-xs text-bone focus:outline-none focus:ring-2 focus:ring-gold/50" aria-label="Agregar triángulo"><Square size={14} className="rotate-45"/> Triángulo</button>
-                                    </Tooltip>
-                                    <Tooltip content="Agrega un polígono" side="right">
-                                        <button onClick={() => { addLayer('polygon'); setIsShapeMenuOpen(false); }} className="flex items-center gap-2 p-2 hover:bg-white/10 rounded text-left text-xs text-bone focus:outline-none focus:ring-2 focus:ring-gold/50" aria-label="Agregar polígono"><Square size={14}/> Polígono</button>
-                                    </Tooltip>
-                                    <Tooltip content="Agrega una línea" side="right">
-                                        <button onClick={() => { addLayer('line'); setIsShapeMenuOpen(false); }} className="flex items-center gap-2 p-2 hover:bg-white/10 rounded text-left text-xs text-bone focus:outline-none focus:ring-2 focus:ring-gold/50" aria-label="Agregar línea"><Activity size={14}/> Línea</button>
-                                    </Tooltip>
+                                    <button onClick={() => { addLayer('rect'); setIsShapeMenuOpen(false); }} className="flex items-center gap-2 p-2 hover:bg-white/10 rounded text-left text-xs text-bone focus:outline-none focus:ring-2 focus:ring-gold/50" aria-label="Agregar rectángulo"><Square size={14}/> Rectángulo</button>
+                                    <button onClick={() => { addLayer('circle'); setIsShapeMenuOpen(false); }} className="flex items-center gap-2 p-2 hover:bg-white/10 rounded text-left text-xs text-bone focus:outline-none focus:ring-2 focus:ring-gold/50" aria-label="Agregar círculo"><CheckSquare size={14} className="rounded-full"/> Círculo</button>
+                                    <button onClick={() => { addLayer('triangle'); setIsShapeMenuOpen(false); }} className="flex items-center gap-2 p-2 hover:bg-white/10 rounded text-left text-xs text-bone focus:outline-none focus:ring-2 focus:ring-gold/50" aria-label="Agregar triángulo"><Square size={14} className="rotate-45"/> Triángulo</button>
+                                    <button onClick={() => { addLayer('polygon'); setIsShapeMenuOpen(false); }} className="flex items-center gap-2 p-2 hover:bg-white/10 rounded text-left text-xs text-bone focus:outline-none focus:ring-2 focus:ring-gold/50" aria-label="Agregar polígono"><Square size={14}/> Polígono</button>
+                                    <button onClick={() => { addLayer('line'); setIsShapeMenuOpen(false); }} className="flex items-center gap-2 p-2 hover:bg-white/10 rounded text-left text-xs text-bone focus:outline-none focus:ring-2 focus:ring-gold/50" aria-label="Agregar línea"><Activity size={14}/> Línea</button>
                                 </motion.div>
                             </>
                         )}
@@ -819,23 +1283,11 @@ export function Studio() {
                 </div>
 
                 <Separator orientation="horizontal" spacing="sm" />
-                <Tooltip content="Agrega texto al canvas" side="right">
-                    <div>
-                        <TooltipButton icon={Type} label="Texto" tooltip="Agrega texto" active={activeTool === 'text'} onClick={() => setActiveTool('text')} />
-                    </div>
-                </Tooltip>
+                <TooltipButton icon={Type} label="Texto" tooltip="Agrega texto" active={activeTool === 'text'} onClick={() => { setActiveTool('text'); setActiveTab('properties'); }} />
 
                 <div className="hidden md:flex flex-col gap-3 mt-auto mb-4 border-t border-white/5 pt-4 w-full px-2">
-                    <Tooltip content="Deshacer última acción (Ctrl+Z)" side="right">
-                        <div>
-                            <TooltipButton icon={RotateCcw} label="Deshacer" tooltip="Ctrl+Z" onClick={undo} disabled={historyIndex <= 0} />
-                        </div>
-                    </Tooltip>
-                    <Tooltip content="Rehacer última acción (Ctrl+Shift+Z)" side="right">
-                        <div>
-                            <TooltipButton icon={RotateCw} label="Rehacer" tooltip="Ctrl+Shift+Z" onClick={redo} disabled={historyIndex >= history.length - 1} />
-                        </div>
-                    </Tooltip>
+                    <TooltipButton icon={RotateCcw} label="Deshacer" tooltip="Ctrl+Z" onClick={undo} disabled={historyIndex <= 0} />
+                    <TooltipButton icon={RotateCw} label="Rehacer" tooltip="Ctrl+Shift+Z" onClick={redo} disabled={historyIndex >= history.length - 1} />
                 </div>
             </div>
         </div>
@@ -844,39 +1296,33 @@ export function Studio() {
         <div className={clsx("w-[300px] bg-abyss/95 backdrop-blur-xl border-r border-white/5 flex flex-col z-20 flex-shrink-0", isMobileMenuOpen?"absolute right-0 h-full":"hidden md:flex")}>
             <div className="h-14 border-b border-white/5 flex items-center px-4 justify-between">
                 <div className="flex gap-4">
-                    <Tooltip content="Panel de propiedades de herramientas y capas" side="bottom">
-                        <button 
-                            onClick={() => setActiveTab('properties')} 
-                            className={clsx("text-[10px] font-bold uppercase focus:outline-none focus:ring-2 focus:ring-gold/50 rounded px-1", activeTab === 'properties' ? "text-white" : TEXT_OPACITY.low)} 
-                            aria-label="Panel de propiedades"
-                            aria-pressed={activeTab === 'properties'}
-                        >
-                            Propiedades
-                        </button>
-                    </Tooltip>
-                    <Tooltip content="Lista de capas del canvas" side="bottom">
-                        <button 
-                            onClick={() => setActiveTab('layers')} 
-                            className={clsx("text-[10px] font-bold uppercase focus:outline-none focus:ring-2 focus:ring-gold/50 rounded px-1", activeTab === 'layers' ? "text-white" : TEXT_OPACITY.low)} 
-                            aria-label="Panel de capas"
-                            aria-pressed={activeTab === 'layers'}
-                        >
-                            Capas
-                        </button>
-                    </Tooltip>
+                    <button 
+                        onClick={() => setActiveTab('properties')} 
+                        className={clsx("text-[10px] font-bold uppercase focus:outline-none focus:ring-2 focus:ring-gold/50 rounded px-1", activeTab === 'properties' ? "text-white" : TEXT_OPACITY.low)} 
+                        aria-label="Panel de propiedades"
+                        aria-pressed={activeTab === 'properties'}
+                    >
+                        Propiedades
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('layers')} 
+                        className={clsx("text-[10px] font-bold uppercase focus:outline-none focus:ring-2 focus:ring-gold/50 rounded px-1", activeTab === 'layers' ? "text-white" : TEXT_OPACITY.low)} 
+                        aria-label="Panel de capas"
+                        aria-pressed={activeTab === 'layers'}
+                    >
+                        Capas
+                    </button>
                 </div>
                 {!selectedLayerIds.length && activeTab === 'properties' && (
                     <div className="relative">
-                        <Tooltip content="Selecciona el tamaño del canvas" side="bottom">
-                            <button 
-                                onClick={() => setIsPresetDropdownOpen(!isPresetDropdownOpen)} 
-                                className="flex items-center gap-2 text-xs font-medium text-gold truncate max-w-[120px] focus:outline-none focus:ring-2 focus:ring-gold/50 rounded px-1"
-                                aria-label="Seleccionar tamaño de canvas"
-                                aria-expanded={isPresetDropdownOpen}
+                        <button 
+                            onClick={() => setIsPresetDropdownOpen(!isPresetDropdownOpen)} 
+                            className="flex items-center gap-2 text-xs font-medium text-gold truncate max-w-[120px] focus:outline-none focus:ring-2 focus:ring-gold/50 rounded px-1"
+                            aria-label="Seleccionar tamaño de canvas"
+                            aria-expanded={isPresetDropdownOpen}
                             >
                                 {activePreset.label} <ChevronDown className={clsx("w-3 h-3 transition-transform", isPresetDropdownOpen && "rotate-180")} />
-                            </button>
-                        </Tooltip>
+                        </button>
                         <AnimatePresence>
                             {isPresetDropdownOpen && (
                                 <>
@@ -936,49 +1382,43 @@ export function Studio() {
                     <div className="flex flex-col h-full relative">
                          <div className="flex items-center justify-between p-3 border-b border-white/10 bg-black/20 shrink-0 sticky top-0 z-10 backdrop-blur-md">
                              <div className="flex items-center gap-2">
-                                <Tooltip content={selectedLayerIds.length === layers.length && layers.length > 0 ? "Deseleccionar todas las capas" : "Seleccionar todas las capas"}>
-                                    <button 
-                                        onClick={() => setSelectedLayerIds(selectedLayerIds.length === layers.length && layers.length > 0 ? [] : layers.map(l => l.id))} 
-                                        className="text-bone/50 hover:text-bone focus:outline-none focus:ring-2 focus:ring-gold/50 rounded"
-                                        aria-label={selectedLayerIds.length === layers.length && layers.length > 0 ? "Deseleccionar todas" : "Seleccionar todas"}
-                                    >
-                                        <CheckSquare size={14} className={selectedLayerIds.length === layers.length && layers.length > 0 ? "text-gold" : ""}/>
-                                    </button>
-                                </Tooltip>
+                                <button 
+                                    onClick={() => setSelectedLayerIds(selectedLayerIds.length === layers.length && layers.length > 0 ? [] : layers.map(l => l.id))} 
+                                    className="text-bone/50 hover:text-bone focus:outline-none focus:ring-2 focus:ring-gold/50 rounded"
+                                    aria-label={selectedLayerIds.length === layers.length && layers.length > 0 ? "Deseleccionar todas las capas" : "Seleccionar todas las capas"}
+                                >
+                                    <CheckSquare size={14} className={selectedLayerIds.length === layers.length && layers.length > 0 ? "text-gold" : ""}/>
+                                </button>
                                 <span className="text-[10px] font-bold text-bone/50 uppercase">{selectedLayerIds.length} Seleccionados</span>
                              </div>
                              <div className="flex items-center gap-1">
-                                <Tooltip content="Duplicar capas seleccionadas">
-                                    <button 
-                                        onClick={() => {
-                                            const newLayers = selectedLayerIds.map(id => {
-                                                const l = layers.find(x => x.id === id);
-                                                if(!l) return null;
-                                                return { ...l, id: `${l.type}_copy_${Date.now()}_${generateId()}`, x: l.x+20, y: l.y+20 };
-                                            }).filter(Boolean) as Layer[];
-                                            if(newLayers.length) {
-                                                updateLayers(prev => [...prev, ...newLayers]);
-                                                setSelectedLayerIds(newLayers.map(l => l.id));
-                                                showNotification(`${newLayers.length} capa(s) duplicada(s)`, 'success');
-                                            }
-                                        }} 
-                                        className="p-1.5 hover:bg-white/10 rounded text-bone transition-colors focus:outline-none focus:ring-2 focus:ring-gold/50" 
-                                        aria-label="Duplicar selección"
-                                        disabled={selectedLayerIds.length === 0}
-                                    >
-                                        <Copy size={14}/>
-                                    </button>
-                                </Tooltip>
-                                <Tooltip content="Eliminar capas seleccionadas">
-                                    <button 
-                                        onClick={deleteSelection} 
-                                        className="p-1.5 hover:bg-red-500/20 rounded text-red-500 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/50" 
-                                        aria-label="Eliminar selección"
-                                        disabled={selectedLayerIds.length === 0}
-                                    >
-                                        <Trash2 size={14}/>
-                                    </button>
-                                </Tooltip>
+                                <button 
+                                    onClick={() => {
+                                        const newLayers = selectedLayerIds.map(id => {
+                                            const l = layers.find(x => x.id === id);
+                                            if(!l) return null;
+                                            return { ...l, id: `${l.type}_copy_${Date.now()}_${generateId()}`, x: l.x+20, y: l.y+20 };
+                                        }).filter(Boolean) as Layer[];
+                                        if(newLayers.length) {
+                                            updateLayers(prev => [...prev, ...newLayers]);
+                                            setSelectedLayerIds(newLayers.map(l => l.id));
+                                            showNotification(`${newLayers.length} capa(s) duplicada(s)`, 'success');
+                                        }
+                                    }} 
+                                    className="p-1.5 hover:bg-white/10 rounded text-bone transition-colors focus:outline-none focus:ring-2 focus:ring-gold/50" 
+                                    aria-label="Duplicar capas seleccionadas"
+                                    disabled={selectedLayerIds.length === 0}
+                                >
+                                    <Copy size={14}/>
+                                </button>
+                                <button 
+                                    onClick={deleteSelection} 
+                                    className="p-1.5 hover:bg-red-500/20 rounded text-red-500 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/50" 
+                                    aria-label="Eliminar capas seleccionadas"
+                                    disabled={selectedLayerIds.length === 0}
+                                >
+                                    <Trash2 size={14}/>
+                                </button>
                              </div>
                          </div>
 
@@ -1013,43 +1453,35 @@ export function Studio() {
                                           onClick={() => { setSelectedLayerIds([l.id]); setActiveTab('properties'); }}
                                      >
                                          <div className="flex items-center gap-3 overflow-hidden">
-                                             <Tooltip content="Arrastra para reordenar">
-                                                 <div className="cursor-grab text-bone/20 hover:text-white" aria-label="Arrastrar capa"><GripVertical size={12}/></div>
-                                             </Tooltip>
-                                             <Tooltip content={isSelected ? "Deseleccionar capa" : "Seleccionar capa"}>
-                                                 <button 
-                                                     onClick={(e) => { e.stopPropagation(); setSelectedLayerIds(prev => prev.includes(l.id) ? prev.filter(id => id !== l.id) : [...prev, l.id]); }} 
-                                                     className="text-bone/20 hover:text-gold focus:outline-none focus:ring-2 focus:ring-gold/50 rounded"
-                                                     aria-label={isSelected ? "Deseleccionar capa" : "Seleccionar capa"}
-                                                     aria-pressed={isSelected}
-                                                 >
-                                                     {isSelected ? <CheckSquare size={14} className="text-gold"/> : <Square size={14}/>}
-                                                 </button>
-                                             </Tooltip>
+                                             <div className="cursor-grab text-bone/20 hover:text-white" aria-label="Arrastrar capa"><GripVertical size={12}/></div>
+                                             <button 
+                                                 onClick={(e) => { e.stopPropagation(); setSelectedLayerIds(prev => prev.includes(l.id) ? prev.filter(id => id !== l.id) : [...prev, l.id]); }} 
+                                                 className="text-bone/20 hover:text-gold focus:outline-none focus:ring-2 focus:ring-gold/50 rounded"
+                                                 aria-label={isSelected ? "Deseleccionar capa" : "Seleccionar capa"}
+                                                 aria-pressed={isSelected}
+                                             >
+                                                 {isSelected ? <CheckSquare size={14} className="text-gold"/> : <Square size={14}/>}
+                                             </button>
                                              {l.type === 'text' ? <Type className="w-3 h-3 text-bone/50 shrink-0" aria-hidden="true"/> : l.type.includes('shape') || l.type==='rect' ? <Square className="w-3 h-3 text-bone/50 shrink-0" aria-hidden="true"/> : l.type==='drawing' ? <Brush className="w-3 h-3 text-bone/50 shrink-0" aria-hidden="true"/> : <ImageIcon className="w-3 h-3 text-bone/50 shrink-0" aria-hidden="true"/>}
                                              <span className={clsx("text-xs truncate transition-colors", isSelected ? "text-white font-medium" : TEXT_OPACITY.medium)}>{l.text || l.id}</span>
                                          </div>
                                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Tooltip content={l.locked ? "Desbloquear capa" : "Bloquear capa"}>
-                                                <button 
-                                                    onClick={(e) => { e.stopPropagation(); updateLayer(l.id, { locked: !l.locked }); }} 
-                                                    className={clsx("p-1 hover:text-white focus:outline-none focus:ring-2 focus:ring-gold/50 rounded", l.locked ? "text-gold opacity-100" : "text-bone/20")}
-                                                    aria-label={l.locked ? "Desbloquear capa" : "Bloquear capa"}
-                                                    aria-pressed={l.locked}
-                                                >
-                                                    <Lock className="w-3 h-3"/>
-                                                </button>
-                                            </Tooltip>
-                                            <Tooltip content={l.visible ? "Ocultar capa" : "Mostrar capa"}>
-                                                <button 
-                                                    onClick={(e) => { e.stopPropagation(); updateLayer(l.id, { visible: !l.visible }); }} 
-                                                    className={clsx("p-1 hover:text-white focus:outline-none focus:ring-2 focus:ring-gold/50 rounded", !l.visible ? "text-bone/20 opacity-100" : "text-bone/50")}
-                                                    aria-label={l.visible ? "Ocultar capa" : "Mostrar capa"}
-                                                    aria-pressed={l.visible}
-                                                >
-                                                    <Eye className="w-3 h-3"/>
-                                                </button>
-                                            </Tooltip>
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); updateLayer(l.id, { locked: !l.locked }); }} 
+                                                className={clsx("p-1 hover:text-white focus:outline-none focus:ring-2 focus:ring-gold/50 rounded", l.locked ? "text-gold opacity-100" : "text-bone/20")}
+                                                aria-label={l.locked ? "Desbloquear capa" : "Bloquear capa"}
+                                                aria-pressed={l.locked}
+                                            >
+                                                <Lock className="w-3 h-3"/>
+                                            </button>
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); updateLayer(l.id, { visible: !l.visible }); }} 
+                                                className={clsx("p-1 hover:text-white focus:outline-none focus:ring-2 focus:ring-gold/50 rounded", !l.visible ? "text-bone/20 opacity-100" : "text-bone/50")}
+                                                aria-label={l.visible ? "Ocultar capa" : "Mostrar capa"}
+                                                aria-pressed={l.visible}
+                                            >
+                                                <Eye className="w-3 h-3"/>
+                                            </button>
                                          </div>
                                      </div>
                                  );
@@ -1107,18 +1539,18 @@ export function Studio() {
                                                     {showSuggestedColors && (
                                                         <div className="absolute top-full left-0 mt-2 bg-abyss-panel border border-white/10 rounded-lg p-2 shadow-xl z-50 flex gap-2">
                                                             {SUGGESTED_COLORS.map(c => (
-                                                                <Tooltip key={c.value} content={c.name} side="top">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setBrushState(prev => ({ ...prev, color: c.value }));
-                                                                            addToRecentColors(c.value);
-                                                                            setShowSuggestedColors(false);
+                                                                <button
+                                                                    key={c.value}
+                                                                    onClick={() => {
+                                                                        setBrushState(prev => ({ ...prev, color: c.value }));
+                                                                        addToRecentColors(c.value);
+                                                                        setShowSuggestedColors(false);
                                                                         }}
                                                                         className="w-6 h-6 rounded-full border border-white/20 hover:scale-110 transition-transform"
                                                                         style={{backgroundColor: c.value}}
                                                                         aria-label={c.name}
+                                                                        title={c.name}
                                                                     />
-                                                                </Tooltip>
                                                             ))}
                                                         </div>
                                                     )}
@@ -1127,19 +1559,19 @@ export function Studio() {
                                       </div>
                                   )}
                                   
-                                   {/* BRUSH & ERASER CONTROLS */}
-                                   <div className="space-y-4">
-                                       <RangeControl label="Tamaño" value={brushState.size} min={1} max={100} onChange={(v: number) => setBrushState(prev => ({ ...prev, size: v }))} />
-                                       {(activeTool === 'brush' || activeTool === 'eraser') && (
-                                           <>
-                                                <RangeControl label="Dureza" value={100 - (brushState.blur * 5)} min={0} max={100} onChange={(v: number) => setBrushState(prev => ({ ...prev, blur: (100 - v)/5 }))} />
-                                                <RangeControl label="Opacidad" value={brushState.opacity} min={1} max={100} onChange={(v: number) => setBrushState(prev => ({ ...prev, opacity: v }))} />
-                                           </>
-                                       )}
-                                       <div className="p-3 bg-white/5 rounded text-[10px] text-bone/50">
-                                           Consejo: {activeTool==='eraser' ? 'Usa el borrador para pintar sobre contenido.' : 'Dibuja libremente.'}
-                                       </div>
-                                   </div>
+                                  {/* BRUSH & ERASER CONTROLS */}
+                                  <div className="space-y-4">
+                                      <RangeControl label="Tamaño" value={brushState.size} min={1} max={100} onChange={(v: number) => setBrushState(prev => ({ ...prev, size: v }))} />
+                                      {(activeTool === 'brush' || activeTool === 'eraser') && (
+                                          <>
+                                              <RangeControl label="Dureza" value={100 - (brushState.blur * 5)} min={0} max={100} onChange={(v: number) => setBrushState(prev => ({ ...prev, blur: (100 - v)/5 }))} />
+                                              <RangeControl label="Opacidad" value={brushState.opacity} min={1} max={100} onChange={(v: number) => setBrushState(prev => ({ ...prev, opacity: v }))} />
+                                          </>
+                                      )}
+                                      <div className="p-3 bg-white/5 rounded text-[10px] text-bone/50">
+                                          Consejo: {activeTool==='eraser' ? 'Usa el borrador para pintar sobre contenido.' : 'Dibuja libremente.'}
+                                      </div>
+                                  </div>
                              </div>
                          </div>
                     ) : selectedLayer ? (
@@ -1148,6 +1580,110 @@ export function Studio() {
                             <span className="text-[10px] text-bone/30 font-bold uppercase">{multiSelection ? `${selectedLayerIds.length} Elementos Seleccionados` : `Propiedades de ${selectedLayer?.type ?? 'capa'}`}</span>
                             {multiSelection && <span className="text-[9px] text-gold">Las acciones se aplican a la selección principal</span>}
                         </div>
+                        
+                        {/* SELECT TOOL PROPS - For non-text objects */}
+                        {activeTool === 'select' && selectedLayer && selectedLayer.type !== 'text' && (
+                            <div className="space-y-6">
+                                {/* Tamaño */}
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-bold uppercase text-bone/50">Tamaño</label>
+                                        <select 
+                                            value={sizeUnit} 
+                                            onChange={(e) => setSizeUnit(e.target.value as 'px' | 'cm')}
+                                            className="text-[10px] bg-black/30 border border-white/10 rounded px-2 py-1 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/50"
+                                            aria-label="Unidad de tamaño"
+                                        >
+                                            <option value="px">px</option>
+                                            <option value="cm">cm</option>
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] text-bone/40 uppercase">Ancho</label>
+                                            <input 
+                                                type="number" 
+                                                value={sizeUnit === 'cm' ? Math.round(((selectedLayer.width || 0) / 37.795) * 100) / 100 : Math.round(selectedLayer.width || 0)}
+                                                onChange={(e) => {
+                                                    const value = sizeUnit === 'cm' 
+                                                        ? parseFloat(e.target.value) * 37.795 
+                                                        : parseFloat(e.target.value);
+                                                    updateLayer(selectedLayer.id, { width: value });
+                                                }}
+                                                className="w-full bg-black/20 border border-white/10 rounded p-1 text-xs focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/50"
+                                                aria-label="Ancho"
+                                            />
+                                        </div>
+                                        <div className="space-y-1 relative">
+                                            <label className="text-[9px] text-bone/40 uppercase">Alto</label>
+                                            <input 
+                                                type="number" 
+                                                value={sizeUnit === 'cm' ? Math.round(((selectedLayer.height || 0) / 37.795) * 100) / 100 : Math.round(selectedLayer.height || 0)}
+                                                onChange={(e) => {
+                                                    if (!selectedLayer) return;
+                                                    const h = sizeUnit === 'cm' 
+                                                        ? parseFloat(e.target.value) * 37.795 
+                                                        : parseFloat(e.target.value);
+                                                    const w = selectedLayer.aspectLocked ? h * ((selectedLayer.width||1)/(selectedLayer.height||1)) : (selectedLayer.width||100);
+                                                    updateLayer(selectedLayer.id, {height: h, width: w});
+                                                }} 
+                                                className="w-full bg-black/20 border border-white/10 rounded p-1 text-xs focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/50"
+                                                aria-label="Alto"
+                                            />
+                                            <button 
+                                                onClick={() => selectedLayer && updateLayer(selectedLayer.id, {aspectLocked: !selectedLayer.aspectLocked})} 
+                                                className={clsx("absolute -left-3 top-6 hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-gold/50 rounded", selectedLayer?.aspectLocked ? "text-gold" : "text-bone/20")}
+                                                aria-label={selectedLayer?.aspectLocked ? "Desbloquear proporción" : "Bloquear proporción"}
+                                            >
+                                                {selectedLayer?.aspectLocked ? <Link className="w-3 h-3"/> : <Unlink className="w-3 h-3"/>}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Rotación */}
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-bold uppercase text-bone/50">Rotación</label>
+                                        <button 
+                                            onClick={() => selectedLayer && updateLayer(selectedLayer.id, { rotation: 0 })}
+                                            className="text-[10px] text-gold hover:text-white focus:outline-none focus:ring-2 focus:ring-gold/50 rounded px-1"
+                                            aria-label="Resetear rotación"
+                                        >
+                                            Reset
+                                        </button>
+                                    </div>
+                                    <RangeControl 
+                                        label="" 
+                                        value={selectedLayer.rotation || 0} 
+                                        min={0} 
+                                        max={360} 
+                                        onChange={(v: number) => updateLayer(selectedLayer.id, { rotation: v })} 
+                                    />
+                                    <input 
+                                        type="number" 
+                                        value={Math.round(selectedLayer.rotation || 0)} 
+                                        onChange={(e) => updateLayer(selectedLayer.id, { rotation: parseFloat(e.target.value) || 0 })}
+                                        className="w-full bg-black/20 border border-white/10 rounded p-1 text-xs text-center focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/50"
+                                        min={0}
+                                        max={360}
+                                        aria-label="Ángulo de rotación"
+                                    />
+                                </div>
+                                
+                                {/* Transformación Libre */}
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold uppercase text-bone/50">Transformación</label>
+                                    <button 
+                                        onClick={() => selectedLayer && updateLayer(selectedLayer.id, { aspectLocked: !selectedLayer.aspectLocked })}
+                                        className={clsx("w-full p-2 rounded border text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-gold/50", selectedLayer?.aspectLocked ? "border-gold text-gold bg-gold/10" : "border-white/10 text-bone/40 hover:bg-white/5")}
+                                        aria-label={selectedLayer?.aspectLocked ? "Activar transformación libre" : "Desactivar transformación libre"}
+                                    >
+                                        {selectedLayer?.aspectLocked ? "Proporción bloqueada" : "Transformación libre"}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                         
                         {/* TEXT PROPS */}
                         {selectedLayer?.type === 'text' && (
@@ -1181,6 +1717,100 @@ export function Studio() {
 
                                  <RangeControl label="Tamaño" value={selectedLayer.fontSize||10} min={10} max={400} onChange={(v: number) => updateLayer(selectedLayer.id, {fontSize:v})} />
                                  <RangeControl label="Espaciado" value={selectedLayer.letterSpacing||0} min={-100} max={100} onChange={(v: number) => updateLayer(selectedLayer.id, {letterSpacing:v})} />
+                                 
+                                 {/* Rotación y Orientación */}
+                                 <div className="space-y-3">
+                                     <div className="flex items-center justify-between">
+                                         <label className="text-[10px] font-bold uppercase text-bone/50">Rotación</label>
+                                         <div className="flex gap-1">
+                                             <button 
+                                                 onClick={() => updateLayer(selectedLayer.id, { rotation: (selectedLayer.rotation || 0) - 90 })}
+                                                 className="p-1.5 rounded border border-white/10 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-gold/50"
+                                                 aria-label="Rotar 90° izquierda"
+                                                 title="Rotar 90° izquierda"
+                                             >
+                                                 <RotateCcw className="w-3.5 h-3.5 text-bone/50 hover:text-gold" />
+                                             </button>
+                                             <button 
+                                                 onClick={() => updateLayer(selectedLayer.id, { rotation: (selectedLayer.rotation || 0) + 90 })}
+                                                 className="p-1.5 rounded border border-white/10 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-gold/50"
+                                                 aria-label="Rotar 90° derecha"
+                                                 title="Rotar 90° derecha"
+                                             >
+                                                 <RotateCw className="w-3.5 h-3.5 text-bone/50 hover:text-gold" />
+                                             </button>
+                                             <button 
+                                                 onClick={() => updateLayer(selectedLayer.id, { rotation: 0 })}
+                                                 className="px-2 py-1 text-[9px] border border-white/10 rounded hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-gold/50 text-bone/50 hover:text-gold"
+                                                 aria-label="Resetear rotación"
+                                             >
+                                                 Reset
+                                             </button>
+                                         </div>
+                                     </div>
+                                     <RangeControl 
+                                         label="" 
+                                         value={selectedLayer.rotation || 0} 
+                                         min={0} 
+                                         max={360} 
+                                         onChange={(v: number) => updateLayer(selectedLayer.id, { rotation: v })} 
+                                     />
+                                     <input 
+                                         type="number" 
+                                         value={Math.round(selectedLayer.rotation || 0)} 
+                                         onChange={(e) => updateLayer(selectedLayer.id, { rotation: parseFloat(e.target.value) || 0 })}
+                                         className="w-full bg-black/20 border border-white/10 rounded p-1 text-xs text-center focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/50"
+                                         min={0}
+                                         max={360}
+                                         aria-label="Ángulo de rotación"
+                                     />
+                                 </div>
+                                 
+                                 {/* Orientación Vertical/Horizontal */}
+                                 <div className="space-y-2">
+                                     <label className="text-[10px] font-bold uppercase text-bone/50">Orientación</label>
+                                     <div className="grid grid-cols-2 gap-2">
+                                         <button 
+                                             onClick={() => {
+                                                 const currentRotation = selectedLayer.rotation || 0;
+                                                 // Si está vertical (90 o 270), poner horizontal (0)
+                                                 // Si está horizontal (0 o 180), mantener horizontal
+                                                 const isVertical = Math.abs(currentRotation % 360) === 90 || Math.abs(currentRotation % 360) === 270;
+                                                 updateLayer(selectedLayer.id, { rotation: isVertical ? 0 : currentRotation });
+                                             }}
+                                             className={clsx(
+                                                 "p-3 rounded border text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-gold/50 flex flex-col items-center gap-1",
+                                                 Math.abs((selectedLayer.rotation || 0) % 360) === 0 || Math.abs((selectedLayer.rotation || 0) % 360) === 180
+                                                     ? "border-gold text-gold bg-gold/10"
+                                                     : "border-white/10 text-bone/40 hover:bg-white/5"
+                                             )}
+                                             aria-label="Orientación horizontal"
+                                         >
+                                             <div className="text-lg">→</div>
+                                             <span className="text-[9px]">Horizontal</span>
+                                         </button>
+                                         <button 
+                                             onClick={() => {
+                                                 const currentRotation = selectedLayer.rotation || 0;
+                                                 // Si está horizontal (0 o 180), poner vertical (90)
+                                                 // Si está vertical (90 o 270), mantener vertical
+                                                 const isHorizontal = Math.abs(currentRotation % 360) === 0 || Math.abs(currentRotation % 360) === 180;
+                                                 updateLayer(selectedLayer.id, { rotation: isHorizontal ? 90 : currentRotation });
+                                             }}
+                                             className={clsx(
+                                                 "p-3 rounded border text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-gold/50 flex flex-col items-center gap-1",
+                                                 Math.abs((selectedLayer.rotation || 0) % 360) === 90 || Math.abs((selectedLayer.rotation || 0) % 360) === 270
+                                                     ? "border-gold text-gold bg-gold/10"
+                                                     : "border-white/10 text-bone/40 hover:bg-white/5"
+                                             )}
+                                             aria-label="Orientación vertical"
+                                         >
+                                             <div className="text-lg">↓</div>
+                                             <span className="text-[9px]">Vertical</span>
+                                         </button>
+                                     </div>
+                                 </div>
+                                 
                                  <div className="flex items-center gap-2">
                                      <div className="flex-1">
                                          <RangeControl label="Curva" value={(selectedLayer as any).curve||0} min={-180} max={180} onChange={(v: number) => updateLayer(selectedLayer.id, {curve:v})} />
@@ -1252,8 +1882,24 @@ export function Studio() {
                                      </div>
                                      <div className="space-y-1 relative">
                                          <label className="text-[9px] text-bone/40 uppercase">Alto</label>
-                                         <input type="number" value={Math.round(selectedLayer?.height||0)} onChange={e => selectedLayer && updateLayer(selectedLayer.id, {height: Number(e.target.value)})} className="w-full bg-black/20 border border-white/10 rounded p-1 text-xs"/>
-                                         <button onClick={() => selectedLayer && updateLayer(selectedLayer.id, {aspectLocked: !selectedLayer.aspectLocked})} className={clsx("absolute -left-3 top-6", selectedLayer?.aspectLocked ? "text-gold" : "text-bone/20")} >{selectedLayer?.aspectLocked ? <Link className="w-3 h-3"/> : <Unlink className="w-3 h-3"/>}</button>
+                                         <input 
+                                             type="number" 
+                                             value={Math.round(selectedLayer?.height||0)} 
+                                             onChange={e => {
+                                                 if (!selectedLayer) return;
+                                                 const h = Number(e.target.value);
+                                                 const w = selectedLayer.aspectLocked ? h * ((selectedLayer.width||1)/(selectedLayer.height||1)) : (selectedLayer.width||100);
+                                                 updateLayer(selectedLayer.id, {height: h, width: w});
+                                             }} 
+                                             className="w-full bg-black/20 border border-white/10 rounded p-1 text-xs"
+                                         />
+                                         <button 
+                                             onClick={() => selectedLayer && updateLayer(selectedLayer.id, {aspectLocked: !selectedLayer.aspectLocked})} 
+                                             className={clsx("absolute -left-3 top-6 hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-gold/50 rounded", selectedLayer?.aspectLocked ? "text-gold" : "text-bone/20")}
+                                             aria-label={selectedLayer?.aspectLocked ? "Desbloquear proporción" : "Bloquear proporción"}
+                                         >
+                                             {selectedLayer?.aspectLocked ? <Link className="w-3 h-3"/> : <Unlink className="w-3 h-3"/>}
+                                         </button>
                                      </div>
                                 </div>
 
@@ -1332,8 +1978,16 @@ export function Studio() {
                         </div>
                         
                         <div className="space-y-4">
-                            <div className="p-3 bg-white/5 rounded text-[10px] text-bone/50 mb-2">
-                                Configura las propiedades antes de hacer clic en el canvas para crear texto.
+                            <div className="space-y-2">
+                                <div className="flex justify-between"><label className="text-[10px] font-bold uppercase text-bone/50">Texto</label></div>
+                                <textarea 
+                                    value={tempTextProps.text || ''} 
+                                    onChange={e => setTempTextProps(prev => ({ ...prev, text: e.target.value }))} 
+                                    className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-sm text-bone focus:border-gold outline-none resize-none" 
+                                    rows={2}
+                                    placeholder="Escribe tu texto aquí..."
+                                    aria-label="Campo de texto"
+                                />
                             </div>
                             
                             <div className="space-y-2">
@@ -1373,23 +2027,36 @@ export function Studio() {
                                         {showSuggestedColors && (
                                             <div className="absolute top-full left-0 mt-2 bg-abyss-panel border border-white/10 rounded-lg p-2 shadow-xl z-50 flex gap-2">
                                                 {SUGGESTED_COLORS.map(c => (
-                                                    <Tooltip key={c.value} content={c.name} side="top">
-                                                        <button
-                                                            onClick={() => {
-                                                                setTempTextProps(prev => ({ ...prev, color: c.value }));
-                                                                addToRecentColors(c.value);
-                                                                setShowSuggestedColors(false);
-                                                            }}
-                                                            className="w-6 h-6 rounded-full border border-white/20 hover:scale-110 transition-transform"
-                                                            style={{backgroundColor: c.value}}
-                                                            aria-label={c.name}
-                                                        />
-                                                    </Tooltip>
+                                                    <button
+                                                        key={c.value}
+                                                        onClick={() => {
+                                                            setTempTextProps(prev => ({ ...prev, color: c.value }));
+                                                            addToRecentColors(c.value);
+                                                            setShowSuggestedColors(false);
+                                                        }}
+                                                        className="w-6 h-6 rounded-full border border-white/20 hover:scale-110 transition-transform"
+                                                        style={{backgroundColor: c.value}}
+                                                        aria-label={c.name}
+                                                    />
                                                 ))}
                                             </div>
                                         )}
                                     </div>
                                 </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold uppercase text-bone/50">Fuente</label>
+                                <select 
+                                    value={tempTextProps.fontFamily || FONT_OPTIONS[0].value}
+                                    onChange={e => setTempTextProps(prev => ({ ...prev, fontFamily: e.target.value }))}
+                                    className="w-full bg-black/30 border border-white/10 rounded p-2 text-xs text-bone focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/50"
+                                    aria-label="Seleccionar fuente"
+                                >
+                                    {FONT_OPTIONS.map(f => (
+                                        <option key={f.value} value={f.value}>{f.label}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             <RangeControl 
@@ -1411,22 +2078,71 @@ export function Studio() {
                                 <button 
                                     onClick={() => setTempTextProps(prev => ({ ...prev, fontWeight: prev.fontWeight === 'bold' ? 'normal' : 'bold' }))} 
                                     className={clsx("p-2 rounded border", tempTextProps.fontWeight === 'bold' ? "border-gold text-gold" : "border-white/10 text-bone/50")}
+                                    aria-label="Negrita"
                                 >
                                     <Bold className="w-4 h-4 mx-auto"/>
                                 </button>
                                 <button 
                                     onClick={() => setTempTextProps(prev => ({ ...prev, fontStyle: prev.fontStyle === 'italic' ? 'normal' : 'italic' }))} 
                                     className={clsx("p-2 rounded border", tempTextProps.fontStyle === 'italic' ? "border-gold text-gold" : "border-white/10 text-bone/50")}
+                                    aria-label="Cursiva"
                                 >
                                     <Italic className="w-4 h-4 mx-auto"/>
                                 </button>
                             </div>
+
+                            <button
+                                onClick={() => {
+                                    if (tempTextProps.text && tempTextProps.text.trim()) {
+                                        const centerX = activePreset.width / 2;
+                                        const centerY = activePreset.height / 2;
+                                        addLayer('text', { x: centerX, y: centerY });
+                                        setTempTextProps(prev => ({ ...prev, text: '' }));
+                                        setActiveTool('select');
+                                        showNotification('Texto agregado al canvas', 'success');
+                                    } else {
+                                        showNotification('Escribe un texto antes de agregar', 'warning');
+                                    }
+                                }}
+                                className="w-full py-2.5 bg-gold text-abyss text-xs font-bold rounded hover:bg-gold/90 focus:outline-none focus:ring-2 focus:ring-gold/50 transition-colors uppercase"
+                                aria-label="Agregar texto al canvas"
+                            >
+                                Agregar Texto
+                            </button>
                         </div>
                     </div>
                 ) : activeTool === 'image' ? (
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                         <div>
-                             <h4 className="text-sm font-medium text-white mb-2">Fondo del Canvas</h4>
+                             <div className="flex items-center justify-between mb-2">
+                                 <h4 className="text-sm font-medium text-white">Fondo del Canvas</h4>
+                                 {backgroundState.image && (
+                                     <button 
+                                         onClick={() => {
+                                             if (initialBgStateRef.current) {
+                                                 setBackgroundState(prev => ({
+                                                     ...prev,
+                                                     scale: initialBgStateRef.current!.scale,
+                                                     offset: initialBgStateRef.current!.offset,
+                                                     filters: {
+                                                         brightness: initialBgStateRef.current!.filters.brightness,
+                                                         contrast: initialBgStateRef.current!.filters.contrast,
+                                                         saturation: initialBgStateRef.current!.filters.saturation,
+                                                         blur: initialBgStateRef.current!.filters.blur,
+                                                         preset: initialBgStateRef.current!.filters.preset || ''
+                                                     }
+                                                 }));
+                                                 setFilterIntensity(100);
+                                                 showNotification('Ajustes de imagen restablecidos', 'success');
+                                             }
+                                         }}
+                                         className="text-xs text-gold hover:text-white focus:outline-none focus:ring-2 focus:ring-gold/50 rounded px-2 py-1 transition-colors"
+                                         aria-label="Resetear ajustes de imagen"
+                                     >
+                                         Reset
+                                     </button>
+                                 )}
+                             </div>
                              <div onClick={() => fileInputRef.current?.click()} className="h-32 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-white/5 bg-black/20 group relative overflow-hidden transition-all">
                                  {backgroundState.image ? (
                                      <img src={backgroundState.image} loading="lazy" className="h-full object-contain opacity-50" alt="Fondo del canvas"/>
@@ -1508,7 +2224,10 @@ export function Studio() {
                                              {FILTER_PRESETS.map(f => (
                                                  <button 
                                                      key={f.label} 
-                                                     onClick={() => setBackgroundState(prev => ({ ...prev, filters: { ...prev.filters, preset: f.value } }))} 
+                                                     onClick={() => {
+                                                         setBackgroundState(prev => ({ ...prev, filters: { ...prev.filters, preset: f.value } }));
+                                                         setFilterIntensity(100); // Reset intensity when changing preset
+                                                     }} 
                                                      className={clsx("px-2 py-1.5 text-[10px] border rounded focus:outline-none focus:ring-2 focus:ring-gold/50 transition-colors", backgroundState.filters.preset === f.value ? "border-gold text-gold bg-gold/10" : "border-white/10 text-bone/40 hover:bg-white/5")} 
                                                      aria-label={`Aplicar filtro ${f.label}`}
                                                  >
@@ -1554,71 +2273,61 @@ export function Studio() {
         {/* CANVAS */}
         <div className="flex-1 relative bg-[#050508] overflow-hidden flex flex-col items-center justify-center" onMouseDown={() => setIsMobileMenuOpen(false)}>
             <div className="absolute top-4 right-4 z-40 bg-abyss-panel border border-white/10 rounded-lg p-1 flex items-center gap-1 shadow-2xl">
-                 <Tooltip content="Ajustar a pantalla" side="bottom">
-                     <button 
-                         onClick={() => {
-                             const frame = document.getElementById('canvas-frame');
-                             if (frame) {
-                                 const container = frame.parentElement;
-                                 if (container) {
-                                     const containerRect = container.getBoundingClientRect();
-                                     const scaleX = (containerRect.width * 0.9) / activePreset.width;
-                                     const scaleY = (containerRect.height * 0.9) / activePreset.height;
-                                     const newZoom = Math.min(scaleX, scaleY, 1);
-                                     setZoom(newZoom);
-                                     setViewportOffset({ x: 0, y: 0 });
-                                 }
+                 <button 
+                     onClick={() => {
+                         const frame = document.getElementById('canvas-frame');
+                         if (frame) {
+                             const container = frame.parentElement;
+                             if (container) {
+                                 const containerRect = container.getBoundingClientRect();
+                                 const scaleX = (containerRect.width * 0.9) / activePreset.width;
+                                 const scaleY = (containerRect.height * 0.9) / activePreset.height;
+                                 const newZoom = Math.min(scaleX, scaleY, 1);
+                                 setZoom(newZoom);
+                                 setViewportOffset({ x: 0, y: 0 });
                              }
-                         }} 
-                         className="p-1.5 flex items-center justify-center text-bone/50 hover:text-gold focus:outline-none focus:ring-2 focus:ring-gold/50 rounded"
-                         aria-label="Ajustar a pantalla"
-                     >
-                         <Maximize2 className="w-3.5 h-3.5" />
-                     </button>
-                 </Tooltip>
-                 <Tooltip content="Restablecer vista" side="bottom">
-                     <button 
-                         onClick={() => {
-                             setZoom(0.4);
-                             setViewportOffset({ x: 0, y: 0 });
-                         }} 
-                         className="p-1.5 flex items-center justify-center text-bone/50 hover:text-gold focus:outline-none focus:ring-2 focus:ring-gold/50 rounded"
-                         aria-label="Restablecer vista"
-                     >
-                         <ResetIcon className="w-3.5 h-3.5" />
-                     </button>
-                 </Tooltip>
+                         }
+                     }} 
+                     className="p-1.5 flex items-center justify-center text-bone/50 hover:text-gold focus:outline-none focus:ring-2 focus:ring-gold/50 rounded"
+                     aria-label="Ajustar a pantalla"
+                 >
+                     <Maximize2 className="w-3.5 h-3.5" />
+                 </button>
+                 <button 
+                     onClick={() => {
+                         setZoom(0.4);
+                         setViewportOffset({ x: 0, y: 0 });
+                     }} 
+                     className="p-1.5 flex items-center justify-center text-bone/50 hover:text-gold focus:outline-none focus:ring-2 focus:ring-gold/50 rounded"
+                     aria-label="Restablecer vista"
+                 >
+                     <ResetIcon className="w-3.5 h-3.5" />
+                 </button>
                  <Separator orientation="vertical" spacing="sm" className="h-6" />
-                 <Tooltip content="Mostrar/ocultar grid" side="bottom">
-                     <button 
-                         onClick={() => setShowGrid(!showGrid)} 
-                         className={clsx("p-1.5 flex items-center justify-center rounded focus:outline-none focus:ring-2 focus:ring-gold/50", showGrid ? "text-gold" : "text-bone/50 hover:text-bone")}
-                         aria-label={showGrid ? "Ocultar grid" : "Mostrar grid"}
-                         aria-pressed={showGrid}
-                     >
-                         <Grid className="w-3.5 h-3.5" />
-                     </button>
-                 </Tooltip>
+                 <button 
+                     onClick={handleDownloadPNG}
+                     className="p-1.5 flex items-center justify-center text-bone/50 hover:text-gold focus:outline-none focus:ring-2 focus:ring-gold/50 rounded transition-colors"
+                     aria-label="Descargar imagen en PNG"
+                     title="Descargar imagen en PNG de alta calidad"
+                 >
+                     <Download className="w-3.5 h-3.5" />
+                 </button>
                  <Separator orientation="vertical" spacing="sm" className="h-6" />
-                 <Tooltip content="Alejar" side="bottom">
-                     <button 
-                         onClick={() => setZoom(z => Math.max(0.1, z - 0.1))} 
-                         className="w-6 h-6 flex items-center justify-center text-bone/50 hover:text-gold focus:outline-none focus:ring-2 focus:ring-gold/50 rounded"
-                         aria-label="Alejar"
-                     >
-                         <Minus className="w-3 h-3" />
-                     </button>
-                 </Tooltip>
+                 <button 
+                     onClick={() => setZoom(z => Math.max(0.1, z - 0.1))} 
+                     className="w-6 h-6 flex items-center justify-center text-bone/50 hover:text-gold focus:outline-none focus:ring-2 focus:ring-gold/50 rounded"
+                     aria-label="Alejar"
+                 >
+                     <Minus className="w-3 h-3" />
+                 </button>
                  <span className="text-[10px] font-mono text-white w-10 text-center" aria-label={`Zoom: ${Math.round(zoom * 100)}%`}>{Math.round(zoom * 100)}%</span>
-                 <Tooltip content="Acercar" side="bottom">
-                     <button 
-                         onClick={() => setZoom(z => Math.min(2, z + 0.1))} 
-                         className="w-6 h-6 flex items-center justify-center text-bone/50 hover:text-gold focus:outline-none focus:ring-2 focus:ring-gold/50 rounded"
-                         aria-label="Acercar"
-                     >
-                         <Plus className="w-3 h-3" />
-                     </button>
-                 </Tooltip>
+                 <button 
+                     onClick={() => setZoom(z => Math.min(2, z + 0.1))} 
+                     className="w-6 h-6 flex items-center justify-center text-bone/50 hover:text-gold focus:outline-none focus:ring-2 focus:ring-gold/50 rounded"
+                     aria-label="Acercar"
+                 >
+                     <Plus className="w-3 h-3" />
+                 </button>
             </div>
             
             <div 
@@ -1656,17 +2365,15 @@ export function Studio() {
                 )}
 
                 {/* Grid & Guides */}
-                {showGrid && (
-                    <div 
-                        className="absolute inset-0 opacity-10 pointer-events-none" 
-                        style={{ 
-                            backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)', 
-                            backgroundSize: `${40 * zoom}px ${40 * zoom}px`, 
-                            transform: `translate(${viewportOffset.x}px, ${viewportOffset.y}px)`,
-                            willChange: 'transform'
-                        }} 
-                    />
-                )}
+                <div 
+                    className="absolute inset-0 opacity-10 pointer-events-none" 
+                    style={{ 
+                        backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)', 
+                        backgroundSize: `${40 * zoom}px ${40 * zoom}px`, 
+                        transform: `translate(${viewportOffset.x}px, ${viewportOffset.y}px)`,
+                        willChange: 'transform'
+                    }} 
+                />
                 {snapGuides.x !== undefined && <div className="absolute top-0 bottom-0 w-px bg-fuchsia-500 z-50 transition-none" style={{ left: '50%', transform: `translate(${viewportOffset.x}px, 0)` }} />}
                 {snapGuides.y !== undefined && <div className="absolute left-0 right-0 h-px bg-fuchsia-500 z-50 transition-none" style={{ top: '50%', transform: `translate(0, ${viewportOffset.y}px)` }} />}
 
@@ -1675,9 +2382,16 @@ export function Studio() {
                     style={{ left: '50%', top: '50%', width: activePreset.width, height: activePreset.height, transform: `translate(-50%, -50%) translate(${viewportOffset.x}px, ${viewportOffset.y}px) scale(${zoom})` }}
                 >
                     {backgroundState.image && (() => {
-                        const presetFilter = applyFilterWithIntensity(backgroundState.filters.preset || '', filterIntensity);
-                        const adjustmentsFilter = `brightness(${backgroundState.filters.brightness / 100}) contrast(${backgroundState.filters.contrast / 100}) saturate(${backgroundState.filters.saturation / 100}) blur(${backgroundState.filters.blur}px)`;
-                        const combinedFilter = [presetFilter, adjustmentsFilter].filter(Boolean).join(' ');
+                        const combinedFilter = combineFilters(
+                            backgroundState.filters.preset || '', 
+                            filterIntensity,
+                            {
+                                brightness: backgroundState.filters.brightness,
+                                contrast: backgroundState.filters.contrast,
+                                saturation: backgroundState.filters.saturation,
+                                blur: backgroundState.filters.blur
+                            }
+                        );
                         return (
                             <img 
                                 src={backgroundState.image} 
@@ -1787,7 +2501,16 @@ export function Studio() {
                                         style={{
                                             width: l.width, 
                                             height: l.height,
-                                            filter: l.filters ? `${l.filters.preset || ''} brightness(${(l.filters.brightness || 100) / 100}) contrast(${(l.filters.contrast || 100) / 100}) saturate(${(l.filters.saturation || 100) / 100}) blur(${l.filters.blur || 0}px)`.trim() : undefined
+                                            filter: l.filters ? combineFilters(
+                                                l.filters.preset || '',
+                                                100, // Full intensity for layer filters
+                                                {
+                                                    brightness: l.filters.brightness || 100,
+                                                    contrast: l.filters.contrast || 100,
+                                                    saturation: l.filters.saturation || 100,
+                                                    blur: l.filters.blur || 0
+                                                }
+                                            ) : undefined
                                         }} 
                                         className="pointer-events-none block"
                                     />
@@ -1845,13 +2568,41 @@ export function Studio() {
                                     {!l.locked && (
                                         <>
                                             {/* TL */}
-                                            <div onPointerDown={(e) => handlePointerDown(e, 'resize', l.id)} className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-gold rounded-sm cursor-nwse-resize z-50 pointer-events-auto shadow-sm hover:scale-125 transition-transform" />
+                                            <div 
+                                                onPointerDown={(e) => {
+                                                    e.stopPropagation();
+                                                    dragState.current.resizeHandle = 'TL';
+                                                    handlePointerDown(e, 'resize', l.id);
+                                                }} 
+                                                className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-gold rounded-sm cursor-nwse-resize z-50 pointer-events-auto shadow-sm hover:scale-125 transition-transform" 
+                                            />
                                             {/* TR */}
-                                            <div onPointerDown={(e) => handlePointerDown(e, 'resize', l.id)} className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-gold rounded-sm cursor-nesw-resize z-50 pointer-events-auto shadow-sm hover:scale-125 transition-transform" />
+                                            <div 
+                                                onPointerDown={(e) => {
+                                                    e.stopPropagation();
+                                                    dragState.current.resizeHandle = 'TR';
+                                                    handlePointerDown(e, 'resize', l.id);
+                                                }} 
+                                                className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-gold rounded-sm cursor-nesw-resize z-50 pointer-events-auto shadow-sm hover:scale-125 transition-transform" 
+                                            />
                                             {/* BL */}
-                                            <div onPointerDown={(e) => handlePointerDown(e, 'resize', l.id)} className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-gold rounded-sm cursor-nesw-resize z-50 pointer-events-auto shadow-sm hover:scale-125 transition-transform" />
+                                            <div 
+                                                onPointerDown={(e) => {
+                                                    e.stopPropagation();
+                                                    dragState.current.resizeHandle = 'BL';
+                                                    handlePointerDown(e, 'resize', l.id);
+                                                }} 
+                                                className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-gold rounded-sm cursor-nesw-resize z-50 pointer-events-auto shadow-sm hover:scale-125 transition-transform" 
+                                            />
                                             {/* BR */}
-                                            <div onPointerDown={(e) => handlePointerDown(e, 'resize', l.id)} className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-gold rounded-sm cursor-nwse-resize z-50 pointer-events-auto shadow-sm hover:scale-125 transition-transform" />
+                                            <div 
+                                                onPointerDown={(e) => {
+                                                    e.stopPropagation();
+                                                    dragState.current.resizeHandle = 'BR';
+                                                    handlePointerDown(e, 'resize', l.id);
+                                                }} 
+                                                className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-gold rounded-sm cursor-nwse-resize z-50 pointer-events-auto shadow-sm hover:scale-125 transition-transform" 
+                                            />
                                         </>
                                     )}
                                 </>
