@@ -18,78 +18,13 @@ interface Track {
   isPlaceholder?: boolean;
 }
 
-const placeholderTracks: Track[] = [
-  { 
-    id: 1, 
-    title: 'Frequency Session 20', 
-    artist: 'Astrion', 
-    genre: '#House', 
-    timeAgo: '7 hours ago', 
-    duration: '1:02:28',
-    plays: '124',
-    likes: '14',
-    reposts: '2',
-    comments: '1',
-    coverImage: '/images/cover (1).jpg',
+import { TRACKS_DATA } from '../data/mockData';
+
+const placeholderTracks: Track[] = TRACKS_DATA.map(t => ({
+    ...t, 
+    coverImage: t.defaultCover || '', // Map defaultCover to coverImage for UI
     isPlaceholder: true
-  },
-  { 
-    id: 2, 
-    title: 'Frequency Session 19', 
-    artist: 'Astrion', 
-    genre: '#Deep House', 
-    timeAgo: '2 days ago', 
-    duration: '54:20',
-    plays: '856',
-    likes: '42',
-    reposts: '8',
-    comments: '5',
-    coverImage: '/images/cover (2).png',
-    isPlaceholder: true
-  },
-  { 
-    id: 3, 
-    title: 'Frequency Session 18', 
-    artist: 'Astrion', 
-    genre: '#Techno', 
-    timeAgo: '1 week ago', 
-    duration: '51:22',
-    plays: '1.2K',
-    likes: '89',
-    reposts: '12',
-    comments: '8',
-    coverImage: '/images/cover (3).png',
-    isPlaceholder: true
-  },
-    { 
-    id: 4, 
-    title: 'Frequency Session 17', 
-    artist: 'Astrion', 
-    genre: '#Progressive', 
-    timeAgo: '2 weeks ago', 
-    duration: '1:00:57',
-    plays: '2.4K',
-    likes: '156',
-    reposts: '24',
-    comments: '18',
-    coverImage: '/images/cover (4).jpg',
-    isPlaceholder: true
-  },
-  { 
-    id: 5, 
-    title: 'Frequency Session 16', 
-    artist: 'Astrion', 
-    genre: '#Melodic', 
-    timeAgo: '1 month ago', 
-    duration: '58:45',
-    plays: '3.1K',
-    likes: '201',
-    reposts: '45',
-    comments: '22',
-    coverImage: '/images/cover (5).jpg',
-    isPlaceholder: true
-  },
-];
+}));
 
 function Waveform() {
   // eslint-disable-next-line
